@@ -1,0 +1,82 @@
+:root,
+[data-theme="dark"] {
+  --bg: #05070a;
+  --surface-1: #0a0d12;
+  --surface-2: #10141c;
+  --surface-hover: #161b25;
+  --bg-rail: #080a0f;
+  --bg-elev: var(--surface-2);
+  --bg-raised: var(--surface-2);
+  --border: rgba(226, 232, 246, 0.07);
+  --line: var(--border);
+  --text-primary: #eef2f8;
+  --text-secondary: #8b93a7;
+  --text: var(--text-primary);
+  --text-dim: var(--text-secondary);
+  --text-muted: var(--text-secondary);
+  --accent-primary: #3b82f6;
+  --accent-secondary: #8b5cf6;
+  --accent-cyan: #22d3ee;
+  --accent: var(--accent-primary);
+  --accent-soft: rgba(59, 130, 246, 0.14);
+  --focus: rgba(59, 130, 246, 0.5);
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --score: var(--text-primary);
+  --glow-blue: 0 0 22px rgba(59, 130, 246, 0.22);
+  --glow-purple: 0 0 28px rgba(139, 92, 246, 0.2);
+  --glow-cyan: 0 0 20px rgba(34, 211, 238, 0.18);
+  --shadow-1: 0 10px 28px rgba(0, 0, 0, 0.35);
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-xs: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --dur: 180ms;
+  --dur-md: 240ms;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --rail-width: 232px;
+  --rail-collapsed: 76px;
+  --font: "Inter", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+}
+
+[data-theme="light"] {
+  --bg: #eef1f6;
+  --surface-1: #f7f8fb;
+  --surface-2: #ffffff;
+  --surface-hover: #e8edf6;
+  --bg-rail: #f3f5f9;
+  --border: rgba(15, 23, 42, 0.08);
+  --text-primary: #121826;
+  --text-secondary: #5b6478;
+  --accent-primary: #2563eb;
+  --accent-secondary: #7c3aed;
+  --accent-cyan: #0891b2;
+  --accent-soft: rgba(37, 99, 235, 0.1);
+  --focus: rgba(37, 99, 235, 0.4);
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --glow-blue: 0 0 18px rgba(37, 99, 235, 0.12);
+  --glow-purple: 0 0 18px rgba(124, 58, 237, 0.1);
+  --glow-cyan: 0 0 16px rgba(8, 145, 178, 0.1);
+  --shadow-1: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="dark"] .score-excellent,
+[data-theme="dark"] .score-great {
+  color: var(--success);
+}
+
+[data-theme="light"] .score-excellent,
+[data-theme="light"] .score-good,
+[data-theme="light"] .score-great {
+  color: var(--success);
+}

@@ -1,0 +1,845 @@
+{
+  "version": 5,
+  "updatedAt": "2026-08-16",
+  "sourceNote": "Catalogo unico, verificato il 16 agosto 2026 su Hugging Face. Download e preferiti dal repo GGUF; i bench, se ci sono, dalla scheda ufficiale. L’app non è tarata su un computer: dopo l’analisi mostra quelli che stanno sul PC di chi la apre.",
+  "models": [
+    {
+      "id": "qwen38-27b",
+      "name": "Qwen 3.8",
+      "description": "Uscito il 14 agosto 2026. Ventisette miliardi densi, visione inclusa. Il riferimento aperto di questa settimana, se il computer ha spazio.",
+      "categories": ["generale", "scrittura", "visione"],
+      "quality": { "overall": 5, "italian": 4, "coding": 5, "reasoning": 5 },
+      "author": "Qwen / Unsloth",
+      "logoOrg": "Qwen",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 1945635,
+        "likes": 1426,
+        "repo": "unsloth/Qwen3.8-27B-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": [
+          { "label": "Codice", "value": "61,7", "source": "SWE-bench Pro" },
+          { "label": "Scienza", "value": "89,2", "source": "GPQA Diamond" },
+          { "label": "Istruzioni", "value": "79,5", "source": "IFBench" }
+        ]
+      },
+      "variants": [
+        {
+          "id": "qwen38-27b-q4ks",
+          "quant": "Q4_K_S",
+          "filename": "Qwen3.8-27B-Q4_K_S.gguf",
+          "sizeBytes": 16121359328,
+          "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-Q4_K_S.gguf",
+          "sha256": "22200efcd98a7aeeaf83f59b0f1400b055d9e0437900e26b930ef2d42a3eb3f9"
+        },
+        {
+          "id": "qwen38-27b-q4km",
+          "quant": "Q4_K_M",
+          "filename": "Qwen3.8-27B-Q4_K_M.gguf",
+          "sizeBytes": 17106775008,
+          "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-Q4_K_M.gguf",
+          "sha256": "7e78da5d7e3ae28d178121f58646953305f3e5bd3cb46f4a75584e8b6c6fe169"
+        },
+        {
+          "id": "qwen38-27b-ud-q4kxl",
+          "quant": "UD-Q4_K_XL",
+          "filename": "Qwen3.8-27B-UD-Q4_K_XL.gguf",
+          "sizeBytes": 17923394624,
+          "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+          "sha256": "bee238bbeb3dc0a34bde4d0dedbaee1f98c009e8bb4226f03070054c12fb1372"
+        },
+        {
+          "id": "qwen38-27b-q5km",
+          "quant": "Q5_K_M",
+          "filename": "Qwen3.8-27B-Q5_K_M.gguf",
+          "sizeBytes": 19834055648,
+          "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-Q5_K_M.gguf",
+          "sha256": "07deb7fa91bf751d3000774fe5bb8afae5ffb41255fd19980147468052e07177"
+        }
+      ]
+    },
+    {
+      "id": "qwen35-9b",
+      "name": "Qwen 3.5",
+      "description": "Nove miliardi, vede le immagini, italiano solido. Il quotidiano per un PC medio.",
+      "categories": ["generale", "scrittura", "visione"],
+      "quality": { "overall": 4, "italian": 4, "coding": 4, "reasoning": 4 },
+      "author": "Qwen / Unsloth",
+      "logoOrg": "Qwen",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 1194391,
+        "likes": 836,
+        "repo": "unsloth/Qwen3.5-9B-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": [
+          { "label": "Conoscenza", "value": "82,5", "source": "MMLU-Pro" },
+          { "label": "Scienza", "value": "81,7", "source": "GPQA Diamond" },
+          { "label": "Codice", "value": "65,6", "source": "LiveCodeBench v6" }
+        ]
+      },
+      "variants": [
+        {
+          "id": "qwen35-9b-q4ks",
+          "quant": "Q4_K_S",
+          "filename": "Qwen3.5-9B-Q4_K_S.gguf",
+          "sizeBytes": 5394097376,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_S.gguf",
+          "sha256": "023713a5240bf58a84d2890a30deb2e0485abb5b9b9c33ba67596e9248b35f80"
+        },
+        {
+          "id": "qwen35-9b-q4km",
+          "quant": "Q4_K_M",
+          "filename": "Qwen3.5-9B-Q4_K_M.gguf",
+          "sizeBytes": 5680522464,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf",
+          "sha256": "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8"
+        },
+        {
+          "id": "qwen35-9b-q5km",
+          "quant": "Q5_K_M",
+          "filename": "Qwen3.5-9B-Q5_K_M.gguf",
+          "sizeBytes": 6577841376,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q5_K_M.gguf",
+          "sha256": "dc2a39aef291f91a9116ad214058da0d86eb648743a124bd8c333787c4b9c91c"
+        },
+        {
+          "id": "qwen35-9b-q8",
+          "quant": "Q8_0",
+          "filename": "Qwen3.5-9B-Q8_0.gguf",
+          "sizeBytes": 9527502048,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q8_0.gguf",
+          "sha256": "809626574d0cb43d4becfa56169980da2bb448f2299270f7be443cb89d0a6ae4"
+        }
+      ]
+    },
+    {
+      "id": "qwen35-4b",
+      "name": "Qwen 3.5 Leggero",
+      "description": "Quattro miliardi, visione inclusa. Per schede da 6–8 GB o per tenere il computer reattivo.",
+      "categories": ["leggeri", "generale", "visione"],
+      "quality": { "overall": 3, "italian": 4, "coding": 3, "reasoning": 3 },
+      "author": "Qwen / Unsloth",
+      "logoOrg": "Qwen",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 1188420,
+        "likes": 370,
+        "repo": "unsloth/Qwen3.5-4B-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": [
+          { "label": "Conoscenza", "value": "79,1", "source": "MMLU-Pro" },
+          { "label": "Scienza", "value": "76,2", "source": "GPQA Diamond" },
+          { "label": "Codice", "value": "55,8", "source": "LiveCodeBench v6" }
+        ]
+      },
+      "variants": [
+        {
+          "id": "qwen35-4b-q4ks",
+          "quant": "Q4_K_S",
+          "filename": "Qwen3.5-4B-Q4_K_S.gguf",
+          "sizeBytes": 2590430368,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_S.gguf",
+          "sha256": "27caeb0e4b999d92ce0a9fdbdd1a7ba5112908d9de125645883732274be2ea77"
+        },
+        {
+          "id": "qwen35-4b-q4km",
+          "quant": "Q4_K_M",
+          "filename": "Qwen3.5-4B-Q4_K_M.gguf",
+          "sizeBytes": 2740937888,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf",
+          "sha256": "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4"
+        },
+        {
+          "id": "qwen35-4b-q5km",
+          "quant": "Q5_K_M",
+          "filename": "Qwen3.5-4B-Q5_K_M.gguf",
+          "sizeBytes": 3143656608,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q5_K_M.gguf",
+          "sha256": "8814232b85594dcd46c50e5b8b29324a7efe9e746edbe8a3d1df3d3fce7aad39"
+        },
+        {
+          "id": "qwen35-4b-q8",
+          "quant": "Q8_0",
+          "filename": "Qwen3.5-4B-Q8_0.gguf",
+          "sizeBytes": 4482403488,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q8_0.gguf",
+          "sha256": "10cc391b403021dd11c614679d2fd92f611c3681d29e29651b717316965d61e1"
+        }
+      ]
+    },
+    {
+      "id": "qwen35-2b",
+      "name": "Qwen 3.5 Compatto",
+      "description": "Due miliardi. Per notebook magri o per risposte immediate, con le immagini.",
+      "categories": ["leggeri", "generale", "visione"],
+      "quality": { "overall": 3, "italian": 3, "coding": 2, "reasoning": 3 },
+      "author": "Qwen / Unsloth",
+      "logoOrg": "Qwen",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 164560,
+        "likes": 141,
+        "repo": "unsloth/Qwen3.5-2B-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "qwen35-2b-q4ks",
+          "quant": "Q4_K_S",
+          "filename": "Qwen3.5-2B-Q4_K_S.gguf",
+          "sizeBytes": 1217757440,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_S.gguf",
+          "sha256": "56eee7b85a2023ba393c5f9a5a5e372e3645e7925a13adb4d13723fc5bc14124"
+        },
+        {
+          "id": "qwen35-2b-q4km",
+          "quant": "Q4_K_M",
+          "filename": "Qwen3.5-2B-Q4_K_M.gguf",
+          "sizeBytes": 1280835840,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf",
+          "sha256": "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223"
+        },
+        {
+          "id": "qwen35-2b-q5km",
+          "quant": "Q5_K_M",
+          "filename": "Qwen3.5-2B-Q5_K_M.gguf",
+          "sizeBytes": 1435238656,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q5_K_M.gguf",
+          "sha256": "1885b3a9195f8cc09da9a7a7a75afdc1e8d5cbf9fc4a499c3961dddea37098ac"
+        },
+        {
+          "id": "qwen35-2b-q8",
+          "quant": "Q8_0",
+          "filename": "Qwen3.5-2B-Q8_0.gguf",
+          "sizeBytes": 2012012800,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q8_0.gguf",
+          "sha256": "1b04acba824817554f4ce23639bc8495ff70453b8fcb047900c731521021f2c1"
+        }
+      ]
+    },
+    {
+      "id": "qwen35-08b",
+      "name": "Qwen 3.5 Lampo",
+      "description": "Meno di un miliardo. L’opzione più piccola: entra quasi ovunque, qualità da tascabile.",
+      "categories": ["leggeri", "generale", "visione"],
+      "quality": { "overall": 2, "italian": 3, "coding": 2, "reasoning": 2 },
+      "author": "Qwen / Unsloth",
+      "logoOrg": "Qwen",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 292302,
+        "likes": 200,
+        "repo": "unsloth/Qwen3.5-0.8B-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "qwen35-08b-q4ks",
+          "quant": "Q4_K_S",
+          "filename": "Qwen3.5-0.8B-Q4_K_S.gguf",
+          "sizeBytes": 508104960,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_S.gguf",
+          "sha256": "5f7ccfa6e9df0d9ebbaff9ee095b18202bec1e0ac313ca688d2c57c9c80a6bc9"
+        },
+        {
+          "id": "qwen35-08b-q4km",
+          "quant": "Q4_K_M",
+          "filename": "Qwen3.5-0.8B-Q4_K_M.gguf",
+          "sizeBytes": 532517120,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf",
+          "sha256": "bd258782e35f7f458f8aced1adc053e6e92e89bc735ba3be89d38a06121dc517"
+        },
+        {
+          "id": "qwen35-08b-q5km",
+          "quant": "Q5_K_M",
+          "filename": "Qwen3.5-0.8B-Q5_K_M.gguf",
+          "sizeBytes": 590057728,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q5_K_M.gguf",
+          "sha256": "c3ef5827b322c4be08a3a26ce424460d8b37daf593356c2cc1f4e40a7ab0581b"
+        },
+        {
+          "id": "qwen35-08b-q8",
+          "quant": "Q8_0",
+          "filename": "Qwen3.5-0.8B-Q8_0.gguf",
+          "sizeBytes": 811843840,
+          "url": "https://huggingface.co/unsloth/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q8_0.gguf",
+          "sha256": "0ad885ffd4bb022fc4f0d33a3308fa108ef8613159d3b3a67e23abca056b7a6c"
+        }
+      ]
+    },
+    {
+      "id": "qwen36-35b-a3b",
+      "name": "Qwen 3.6 Veloce",
+      "description": "Trentacinque miliardi in totale, ne accende tre. Qualità alta, più leggero in uso di un denso da 27.",
+      "categories": ["generale", "programmazione", "visione"],
+      "quality": { "overall": 4, "italian": 4, "coding": 5, "reasoning": 4 },
+      "author": "Qwen / Unsloth",
+      "logoOrg": "Qwen",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 1173601,
+        "likes": 1538,
+        "repo": "unsloth/Qwen3.6-35B-A3B-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "qwen36-35b-ud-q4ks",
+          "quant": "UD-Q4_K_S",
+          "filename": "Qwen3.6-35B-A3B-UD-Q4_K_S.gguf",
+          "sizeBytes": 20893015008,
+          "url": "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q4_K_S.gguf",
+          "sha256": "a8138f183e3993f12cdc23afd2babb8cdb084e64088ce4a256d49101d47b949c"
+        },
+        {
+          "id": "qwen36-35b-ud-q4km",
+          "quant": "UD-Q4_K_M",
+          "filename": "Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+          "sizeBytes": 22134528992,
+          "url": "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q4_K_M.gguf",
+          "sha256": "ac0e2c1189e055faa36eff361580e79c5bd6f8e76bffb4ce547f167d53e31a61"
+        },
+        {
+          "id": "qwen36-35b-ud-q5km",
+          "quant": "UD-Q5_K_M",
+          "filename": "Qwen3.6-35B-A3B-UD-Q5_K_M.gguf",
+          "sizeBytes": 26456194016,
+          "url": "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q5_K_M.gguf",
+          "sha256": "c13ce26253ea334df472bd8fbd2d6da66d8a41195c17f6fcbf44c4d20ece0932"
+        }
+      ]
+    },
+    {
+      "id": "qwen3-coder-30b",
+      "name": "Qwen 3 Codice",
+      "description": "Fatto per programmare e usare strumenti. Trenta miliardi in totale, ne accende pochi.",
+      "categories": ["programmazione"],
+      "quality": { "overall": 4, "italian": 3, "coding": 5, "reasoning": 4 },
+      "author": "Qwen / Unsloth",
+      "logoOrg": "Qwen",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 9739060,
+        "likes": 901,
+        "repo": "unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "qwen3-coder-30b-q4ks",
+          "quant": "Q4_K_S",
+          "filename": "Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf",
+          "sizeBytes": 17456012448,
+          "url": "https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-Q4_K_S.gguf",
+          "sha256": "56a7d00783419bcb0ae566253c371bcb3678261bb79881a553539f5679864db4"
+        },
+        {
+          "id": "qwen3-coder-30b-q4km",
+          "quant": "Q4_K_M",
+          "filename": "Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf",
+          "sizeBytes": 18556689568,
+          "url": "https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-Q4_K_M.gguf",
+          "sha256": "fadc3e5f8d42bf7e894a785b05082e47daee4df26680389817e2093056f088ad"
+        },
+        {
+          "id": "qwen3-coder-30b-q5km",
+          "quant": "Q5_K_M",
+          "filename": "Qwen3-Coder-30B-A3B-Instruct-Q5_K_M.gguf",
+          "sizeBytes": 21725584544,
+          "url": "https://huggingface.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF/resolve/main/Qwen3-Coder-30B-A3B-Instruct-Q5_K_M.gguf",
+          "sha256": "4b78837bbec5ee248e4a5642bf608b6793721af41b92589e40c8da0bce58b907"
+        }
+      ]
+    },
+    {
+      "id": "gemma4-e2b",
+      "name": "Gemma 4 Lampo",
+      "description": "Il Gemma 4 più piccolo. Vede le immagini, sta in poco spazio, fatto per PC magri.",
+      "categories": ["leggeri", "generale", "visione"],
+      "quality": { "overall": 3, "italian": 3, "coding": 2, "reasoning": 3 },
+      "author": "Google / Unsloth",
+      "logoOrg": "google",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 466216,
+        "likes": 286,
+        "repo": "unsloth/gemma-4-E2B-it-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "gemma4-e2b-q4ks",
+          "quant": "Q4_K_S",
+          "filename": "gemma-4-E2B-it-Q4_K_S.gguf",
+          "sizeBytes": 3043934304,
+          "url": "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_S.gguf",
+          "sha256": "96ee1ee1d562be52dbbc4c12694ed67de8c6ae09451d420fed7d067e552c25cb"
+        },
+        {
+          "id": "gemma4-e2b-q4km",
+          "quant": "Q4_K_M",
+          "filename": "gemma-4-E2B-it-Q4_K_M.gguf",
+          "sizeBytes": 3106738272,
+          "url": "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_K_M.gguf",
+          "sha256": "740185b21d22ceb83a11c3aa62ad5842ef32c70f6096d756bbee85a1e4ec34b8"
+        },
+        {
+          "id": "gemma4-e2b-q5km",
+          "quant": "Q5_K_M",
+          "filename": "gemma-4-E2B-it-Q5_K_M.gguf",
+          "sizeBytes": 3356037216,
+          "url": "https://huggingface.co/unsloth/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q5_K_M.gguf",
+          "sha256": "90293b8cdaf9c973012bf4df8a1e92bde7d74ad66a4fe56cf905ccd563d660c5"
+        }
+      ]
+    },
+    {
+      "id": "gemma4-e4b",
+      "name": "Gemma 4 Leggero",
+      "description": "Gemma 4 da tutti i giorni, taglia piccola. Scrittura pulita e immagini, senza chiedere una scheda grossa.",
+      "categories": ["leggeri", "scrittura", "visione"],
+      "quality": { "overall": 3, "italian": 3, "coding": 3, "reasoning": 3 },
+      "author": "Google / Unsloth",
+      "logoOrg": "google",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 585646,
+        "likes": 586,
+        "repo": "unsloth/gemma-4-E4B-it-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "gemma4-e4b-q4ks",
+          "quant": "Q4_K_S",
+          "filename": "gemma-4-E4B-it-Q4_K_S.gguf",
+          "sizeBytes": 4844850304,
+          "url": "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_S.gguf",
+          "sha256": "0fdbd6df44e505481a0636fe3160d230d6de2ecf0f8a20f06a5c64adef0cae00"
+        },
+        {
+          "id": "gemma4-e4b-q4km",
+          "quant": "Q4_K_M",
+          "filename": "gemma-4-E4B-it-Q4_K_M.gguf",
+          "sizeBytes": 4977171584,
+          "url": "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf",
+          "sha256": "85a896a047553e842f25297ee5b031d64ff30147d9c4af17b1e4b394cd1fab87"
+        },
+        {
+          "id": "gemma4-e4b-q5km",
+          "quant": "Q5_K_M",
+          "filename": "gemma-4-E4B-it-Q5_K_M.gguf",
+          "sizeBytes": 5481798784,
+          "url": "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q5_K_M.gguf",
+          "sha256": "a5d6e634db151368d2caa4270fd32ab604d96c2d1291950586989f46d8e17d36"
+        }
+      ]
+    },
+    {
+      "id": "gemma4-12b",
+      "name": "Gemma 4",
+      "description": "Dodici miliardi. Equilibrio Google: scrittura, spiegazioni e immagini su un PC medio-alto.",
+      "categories": ["generale", "scrittura", "visione"],
+      "quality": { "overall": 4, "italian": 3, "coding": 3, "reasoning": 4 },
+      "author": "Google / Unsloth",
+      "logoOrg": "google",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 550687,
+        "likes": 802,
+        "repo": "unsloth/gemma-4-12b-it-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "gemma4-12b-q4ks",
+          "quant": "Q4_K_S",
+          "filename": "gemma-4-12b-it-Q4_K_S.gguf",
+          "sizeBytes": 6764526400,
+          "url": "https://huggingface.co/unsloth/gemma-4-12b-it-GGUF/resolve/main/gemma-4-12b-it-Q4_K_S.gguf",
+          "sha256": "8bfbcccb50049e670dcc55ba1aabf7e79c65c06eea96e42a0689baf7503aa81f"
+        },
+        {
+          "id": "gemma4-12b-q4km",
+          "quant": "Q4_K_M",
+          "filename": "gemma-4-12b-it-Q4_K_M.gguf",
+          "sizeBytes": 7121861440,
+          "url": "https://huggingface.co/unsloth/gemma-4-12b-it-GGUF/resolve/main/gemma-4-12b-it-Q4_K_M.gguf",
+          "sha256": "0a270ec9fe6b34f4a0d33992b6135117b484ebc4766ab76b51d4ae8c457e4c42"
+        },
+        {
+          "id": "gemma4-12b-q5km",
+          "quant": "Q5_K_M",
+          "filename": "gemma-4-12b-it-Q5_K_M.gguf",
+          "sizeBytes": 8413576000,
+          "url": "https://huggingface.co/unsloth/gemma-4-12b-it-GGUF/resolve/main/gemma-4-12b-it-Q5_K_M.gguf",
+          "sha256": "32c554c7d1338a23837ae39b3db482213a4a642f96df3b2619f516a2375d16cd"
+        }
+      ]
+    },
+    {
+      "id": "gemma4-26b-a4b",
+      "name": "Gemma 4 Misto",
+      "description": "Ventisei miliardi in totale, ne accende quattro. Più veloce di un denso della stessa fascia.",
+      "categories": ["generale", "visione"],
+      "quality": { "overall": 4, "italian": 3, "coding": 3, "reasoning": 4 },
+      "author": "Google / Unsloth",
+      "logoOrg": "google",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 1339880,
+        "likes": 1056,
+        "repo": "unsloth/gemma-4-26B-A4B-it-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "gemma4-26b-ud-q4ks",
+          "quant": "UD-Q4_K_S",
+          "filename": "gemma-4-26B-A4B-it-UD-Q4_K_S.gguf",
+          "sizeBytes": 16487610080,
+          "url": "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-UD-Q4_K_S.gguf",
+          "sha256": "675de4b188a3072c9da8260fe2eddfdb7d03b16f615b6619021989d929a51b2b"
+        },
+        {
+          "id": "gemma4-26b-ud-q4km",
+          "quant": "UD-Q4_K_M",
+          "filename": "gemma-4-26B-A4B-it-UD-Q4_K_M.gguf",
+          "sizeBytes": 16947541728,
+          "url": "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-UD-Q4_K_M.gguf",
+          "sha256": "f2c28b3dc4776931ac6f879e11f203dec637ea0f14267a86ec8f6165f63f293f"
+        },
+        {
+          "id": "gemma4-26b-ud-q5km",
+          "quant": "UD-Q5_K_M",
+          "filename": "gemma-4-26B-A4B-it-UD-Q5_K_M.gguf",
+          "sizeBytes": 21150365408,
+          "url": "https://huggingface.co/unsloth/gemma-4-26B-A4B-it-GGUF/resolve/main/gemma-4-26B-A4B-it-UD-Q5_K_M.gguf",
+          "sha256": "769d386a69d43782321c1bad04d41d29a2e84b2c06e6a277cd99fd6265ec0e80"
+        }
+      ]
+    },
+    {
+      "id": "gemma4-31b",
+      "name": "Gemma 4 Grande",
+      "description": "Trentuno miliardi densi. Per chi ha una scheda capiente e vuole il Gemma 4 pieno.",
+      "categories": ["generale", "scrittura", "visione"],
+      "quality": { "overall": 5, "italian": 3, "coding": 4, "reasoning": 4 },
+      "author": "Google / Unsloth",
+      "logoOrg": "google",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 537047,
+        "likes": 579,
+        "repo": "unsloth/gemma-4-31B-it-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "gemma4-31b-q4ks",
+          "quant": "Q4_K_S",
+          "filename": "gemma-4-31B-it-Q4_K_S.gguf",
+          "sizeBytes": 17399835584,
+          "url": "https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q4_K_S.gguf",
+          "sha256": "41557bd9b7fd0973f2648942fd3d073c5f7dd2aff30d4c91f934ad907dacbf7c"
+        },
+        {
+          "id": "gemma4-31b-q4km",
+          "quant": "Q4_K_M",
+          "filename": "gemma-4-31B-it-Q4_K_M.gguf",
+          "sizeBytes": 18323733440,
+          "url": "https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q4_K_M.gguf",
+          "sha256": "38bd64c852c4b460434cc7162fa9bdcf242faf86502581a754cb72956bb17f84"
+        },
+        {
+          "id": "gemma4-31b-q5km",
+          "quant": "Q5_K_M",
+          "filename": "gemma-4-31B-it-Q5_K_M.gguf",
+          "sizeBytes": 21658401728,
+          "url": "https://huggingface.co/unsloth/gemma-4-31B-it-GGUF/resolve/main/gemma-4-31B-it-Q5_K_M.gguf",
+          "sha256": "95192e41190ef5eb72db92b669cea0ed733049c2265a03a64ac5a080d8605958"
+        }
+      ]
+    },
+    {
+      "id": "muse-glimmer-30b",
+      "name": "Muse",
+      "description": "Uscito ad agosto 2026 da Meta. Trenta miliardi, agenti e immagini, pensato per stare in locale.",
+      "categories": ["generale", "ragionamento", "visione"],
+      "quality": { "overall": 5, "italian": 3, "coding": 4, "reasoning": 5 },
+      "author": "Meta / Unsloth",
+      "logoOrg": "meta-llama",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 718178,
+        "likes": 452,
+        "repo": "unsloth/Muse-Glimmer-30B-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": [
+          { "label": "Codice", "value": "51,2", "source": "SWE-bench Pro" },
+          { "label": "Scienza", "value": "83,5", "source": "GPQA Diamond" },
+          { "label": "Istruzioni", "value": "77,0", "source": "IFBench" }
+        ]
+      },
+      "variants": [
+        {
+          "id": "muse-30b-ud-q3kxl",
+          "quant": "UD-Q3_K_XL",
+          "filename": "Muse-Glimmer-30B-UD-Q3_K_XL.gguf",
+          "sizeBytes": 13360983072,
+          "url": "https://huggingface.co/unsloth/Muse-Glimmer-30B-GGUF/resolve/main/Muse-Glimmer-30B-UD-Q3_K_XL.gguf",
+          "sha256": "820d18e00c59376331eba62dd716a6bcdcaa305c2316f5da3a2fab36c7c37e15"
+        },
+        {
+          "id": "muse-30b-ud-q4kxl",
+          "quant": "UD-Q4_K_XL",
+          "filename": "Muse-Glimmer-30B-UD-Q4_K_XL.gguf",
+          "sizeBytes": 15878222368,
+          "url": "https://huggingface.co/unsloth/Muse-Glimmer-30B-GGUF/resolve/main/Muse-Glimmer-30B-UD-Q4_K_XL.gguf",
+          "sha256": "82bece304887a313ece08400bc030f6066c7bff5b906b0cd40308ec8a409fd38"
+        },
+        {
+          "id": "muse-30b-ud-q5km",
+          "quant": "UD-Q5_K_M",
+          "filename": "Muse-Glimmer-30B-UD-Q5_K_M.gguf",
+          "sizeBytes": 19194274848,
+          "url": "https://huggingface.co/unsloth/Muse-Glimmer-30B-GGUF/resolve/main/Muse-Glimmer-30B-UD-Q5_K_M.gguf",
+          "sha256": "27c27bc0cc2591344a9ef977d57aa79a9d36ddebee59660bd2abbf738f940f5b"
+        }
+      ]
+    },
+    {
+      "id": "nemotron-35-lightning",
+      "name": "Nemotron Fulmine",
+      "description": "NVIDIA, agosto 2026. Trenta miliardi in totale, tre attivi: fatto per andare svelto sul codice e in chat.",
+      "categories": ["programmazione", "generale"],
+      "quality": { "overall": 4, "italian": 3, "coding": 5, "reasoning": 4 },
+      "author": "NVIDIA / Unsloth",
+      "logoOrg": "nvidia",
+      "license": "NVIDIA",
+      "stats": {
+        "downloads": 84805,
+        "likes": 70,
+        "repo": "unsloth/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "nemotron-35-iq4nl",
+          "quant": "UD-IQ4_NL",
+          "filename": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-IQ4_NL.gguf",
+          "sizeBytes": 21235202112,
+          "url": "https://huggingface.co/unsloth/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF/resolve/main/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-IQ4_NL.gguf",
+          "sha256": "0c105fe72b1c058e201c255cec225ca60049a753054eb4c06c404d7b2cf9b82b"
+        },
+        {
+          "id": "nemotron-35-ud-q4ks",
+          "quant": "UD-Q4_K_S",
+          "filename": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q4_K_S.gguf",
+          "sizeBytes": 24468027456,
+          "url": "https://huggingface.co/unsloth/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF/resolve/main/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q4_K_S.gguf",
+          "sha256": "98f35cfb211ee7e777f3d2625ba78931b1df870395b175ec98d775caf15705c6"
+        },
+        {
+          "id": "nemotron-35-ud-q4km",
+          "quant": "UD-Q4_K_M",
+          "filename": "NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q4_K_M.gguf",
+          "sizeBytes": 25266255936,
+          "url": "https://huggingface.co/unsloth/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-GGUF/resolve/main/NVIDIA-Nemotron-3.5-Lightning-30B-A3B-UD-Q4_K_M.gguf",
+          "sha256": "edcb5d4650796ed2fb412498de6f83b585862312c747ddb74f0ea04b22206181"
+        }
+      ]
+    },
+    {
+      "id": "north-mini-code",
+      "name": "North Codice",
+      "description": "Cohere, specializzato sul codice. Pesante sul disco, parco in uso se il PC lo regge.",
+      "categories": ["programmazione"],
+      "quality": { "overall": 4, "italian": 2, "coding": 5, "reasoning": 4 },
+      "author": "Cohere / Unsloth",
+      "logoOrg": "CohereLabs",
+      "license": "Apache 2.0",
+      "stats": {
+        "downloads": 20248,
+        "likes": 134,
+        "repo": "unsloth/North-Mini-Code-1.0-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "north-code-iq3xxs",
+          "quant": "UD-IQ3_XXS",
+          "filename": "North-Mini-Code-1.0-UD-IQ3_XXS.gguf",
+          "sizeBytes": 11708375136,
+          "url": "https://huggingface.co/unsloth/North-Mini-Code-1.0-GGUF/resolve/main/North-Mini-Code-1.0-UD-IQ3_XXS.gguf",
+          "sha256": "029b51f93570c4295680bf6fb138bbc51bba7c377d613f75ac4eaa6913597140"
+        },
+        {
+          "id": "north-code-ud-q4ks",
+          "quant": "UD-Q4_K_S",
+          "filename": "North-Mini-Code-1.0-UD-Q4_K_S.gguf",
+          "sizeBytes": 18045558880,
+          "url": "https://huggingface.co/unsloth/North-Mini-Code-1.0-GGUF/resolve/main/North-Mini-Code-1.0-UD-Q4_K_S.gguf",
+          "sha256": "b62eee03ca42a69401bc5b17e22ce78cf34469628a3cf7b4cf6ac2406078a28a"
+        },
+        {
+          "id": "north-code-ud-q4km",
+          "quant": "UD-Q4_K_M",
+          "filename": "North-Mini-Code-1.0-UD-Q4_K_M.gguf",
+          "sizeBytes": 19203186784,
+          "url": "https://huggingface.co/unsloth/North-Mini-Code-1.0-GGUF/resolve/main/North-Mini-Code-1.0-UD-Q4_K_M.gguf",
+          "sha256": "d59f4cb3abec1bd3e5e185b99cdd811e3be3402cbc2bab8223081a460d5724bf"
+        }
+      ]
+    },
+    {
+      "id": "ornith-9b",
+      "name": "Ornith",
+      "description": "Nove miliardi, MIT. Taglia da Qwen 3.5, più orientato a ragionare a passi.",
+      "categories": ["ragionamento", "generale"],
+      "quality": { "overall": 4, "italian": 3, "coding": 3, "reasoning": 5 },
+      "author": "DeepReinforce / Unsloth",
+      "logoOrg": "DeepReinforce",
+      "license": "MIT",
+      "stats": {
+        "downloads": 93891,
+        "likes": 57,
+        "repo": "unsloth/Ornith-1.0-9B-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "ornith-9b-q4ks",
+          "quant": "Q4_K_S",
+          "filename": "Ornith-1.0-9B-Q4_K_S.gguf",
+          "sizeBytes": 5423588448,
+          "url": "https://huggingface.co/unsloth/Ornith-1.0-9B-GGUF/resolve/main/Ornith-1.0-9B-Q4_K_S.gguf",
+          "sha256": "3c75301fca20807e088ab874010f09d46f8f909a5f943d9e60be18084b2c5154"
+        },
+        {
+          "id": "ornith-9b-q4km",
+          "quant": "Q4_K_M",
+          "filename": "Ornith-1.0-9B-Q4_K_M.gguf",
+          "sizeBytes": 5701067872,
+          "url": "https://huggingface.co/unsloth/Ornith-1.0-9B-GGUF/resolve/main/Ornith-1.0-9B-Q4_K_M.gguf",
+          "sha256": "641675b356a4463677a02a0d703f7b571b39f0b747fbd270b379c848edc29e84"
+        },
+        {
+          "id": "ornith-9b-q5km",
+          "quant": "Q5_K_M",
+          "filename": "Ornith-1.0-9B-Q5_K_M.gguf",
+          "sizeBytes": 6542287968,
+          "url": "https://huggingface.co/unsloth/Ornith-1.0-9B-GGUF/resolve/main/Ornith-1.0-9B-Q5_K_M.gguf",
+          "sha256": "edddf3898706262cebb5f84618ff0777e9159bfc0ba411b3116970524ea5d21e"
+        }
+      ]
+    },
+    {
+      "id": "lfm25-12b",
+      "name": "LFM Piccolo",
+      "description": "Liquid, un miliardo e poco più. Per PC molto magri: chat corta, veloce, senza pretese.",
+      "categories": ["leggeri", "generale"],
+      "quality": { "overall": 2, "italian": 2, "coding": 2, "reasoning": 2 },
+      "author": "Liquid / Unsloth",
+      "logoOrg": "LiquidAI",
+      "license": "Liquid AI",
+      "stats": {
+        "downloads": 67854,
+        "likes": 45,
+        "repo": "unsloth/LFM2.5-1.2B-Instruct-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "lfm25-12b-q4ks",
+          "quant": "Q4_K_S",
+          "filename": "LFM2.5-1.2B-Instruct-Q4_K_S.gguf",
+          "sizeBytes": 700470496,
+          "url": "https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_S.gguf",
+          "sha256": "cd1db3ae5a1671e832245bacab9c6179d43f4502c1c4230a3c6e380f6bbac9e7"
+        },
+        {
+          "id": "lfm25-12b-q4km",
+          "quant": "Q4_K_M",
+          "filename": "LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
+          "sizeBytes": 730895584,
+          "url": "https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q4_K_M.gguf",
+          "sha256": "856aeee6d85ac684b1db8dee48795b44fc06731ecda03aee36ece682413a9b9a"
+        },
+        {
+          "id": "lfm25-12b-q5km",
+          "quant": "Q5_K_M",
+          "filename": "LFM2.5-1.2B-Instruct-Q5_K_M.gguf",
+          "sizeBytes": 843355360,
+          "url": "https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q5_K_M.gguf",
+          "sha256": "7ad5eef540097e1afc0118799e5d22005c0c1721cba0a2b01bed287e4888baaf"
+        },
+        {
+          "id": "lfm25-12b-q8",
+          "quant": "Q8_0",
+          "filename": "LFM2.5-1.2B-Instruct-Q8_0.gguf",
+          "sizeBytes": 1246254304,
+          "url": "https://huggingface.co/unsloth/LFM2.5-1.2B-Instruct-GGUF/resolve/main/LFM2.5-1.2B-Instruct-Q8_0.gguf",
+          "sha256": "b808eead8d6061f71990ab7b144c5ca6650fad219aa7acc407fe5fb26abf3dc2"
+        }
+      ]
+    },
+    {
+      "id": "lfm25-8b-a1b",
+      "name": "LFM Veloce",
+      "description": "Otto miliardi in totale, uno attivo. Leggero in memoria, adatto a un PC che fa anche altro.",
+      "categories": ["leggeri", "generale"],
+      "quality": { "overall": 3, "italian": 2, "coding": 2, "reasoning": 3 },
+      "author": "Liquid / Unsloth",
+      "logoOrg": "LiquidAI",
+      "license": "Liquid AI",
+      "stats": {
+        "downloads": 24223,
+        "likes": 100,
+        "repo": "unsloth/LFM2.5-8B-A1B-GGUF",
+        "checkedAt": "2026-08-16",
+        "benches": []
+      },
+      "variants": [
+        {
+          "id": "lfm25-8b-ud-q4ks",
+          "quant": "UD-Q4_K_S",
+          "filename": "LFM2.5-8B-A1B-UD-Q4_K_S.gguf",
+          "sizeBytes": 5013941856,
+          "url": "https://huggingface.co/unsloth/LFM2.5-8B-A1B-GGUF/resolve/main/LFM2.5-8B-A1B-UD-Q4_K_S.gguf",
+          "sha256": "ff96de1f5ec9b6ee4f78524fcce3955d3fae89413f58e993f30126587d9f4032"
+        },
+        {
+          "id": "lfm25-8b-ud-q4km",
+          "quant": "UD-Q4_K_M",
+          "filename": "LFM2.5-8B-A1B-UD-Q4_K_M.gguf",
+          "sizeBytes": 5322223200,
+          "url": "https://huggingface.co/unsloth/LFM2.5-8B-A1B-GGUF/resolve/main/LFM2.5-8B-A1B-UD-Q4_K_M.gguf",
+          "sha256": "e2c8350d5e6e7c633b2ba4e20805a2c86bc46884cd285e8f3fe36ad917b772c7"
+        },
+        {
+          "id": "lfm25-8b-ud-q5km",
+          "quant": "UD-Q5_K_M",
+          "filename": "LFM2.5-8B-A1B-UD-Q5_K_M.gguf",
+          "sizeBytes": 6361886304,
+          "url": "https://huggingface.co/unsloth/LFM2.5-8B-A1B-GGUF/resolve/main/LFM2.5-8B-A1B-UD-Q5_K_M.gguf",
+          "sha256": "90e0b86095c6485fd5a9b7fa9822a02ebb103b6846f3eb3648643cea946fe9cf"
+        }
+      ]
+    }
+  ]
+}
