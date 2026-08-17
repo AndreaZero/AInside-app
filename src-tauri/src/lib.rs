@@ -75,6 +75,7 @@ pub fn run() {
             runtime::start_completion,
             runtime::start_coding_turn,
             runtime::stop_completion,
+            runtime::get_debug_report,
             chat::list_chats,
             chat::create_chat,
             chat::open_chat,

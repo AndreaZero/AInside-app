@@ -17,6 +17,9 @@ export type WorkspaceFile = {
   rel: string;
   text: string;
   truncated: boolean;
+  kind?: string;
+  mime?: string | null;
+  dataUrl?: string | null;
 };
 
 export type WorkspaceHit = {

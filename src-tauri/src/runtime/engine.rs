@@ -275,6 +275,12 @@ fn find_server(dir: &Path) -> Option<PathBuf> {
     None
 }
 
+pub fn installed_meta(app_data: &Path, hardware: &HardwareReport) -> (EngineKind, Option<String>) {
+    let kind = choose_kind(hardware);
+    let tag = read_tag(&runtime_root(app_data).join(kind.folder()));
+    (kind, tag)
+}
+
 fn engine_is_current(dir: &Path) -> bool {
     parse_build(&read_tag(dir).unwrap_or_default()).unwrap_or(0) >= MIN_ENGINE_BUILD
 }

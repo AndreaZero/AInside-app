@@ -4,7 +4,7 @@ import { ChatProvider, useChats } from "../hooks/useChats";
 import { DownloadProvider } from "../hooks/useDownloads";
 import { HardwareProvider } from "../hooks/useHardwareProfile";
 import { LibraryProvider, useLibrary, useLibrarySnapshot } from "../hooks/useLibrary";
-import { RuntimeProvider, useRuntime } from "../hooks/useRuntime";
+import { RuntimeProvider, useRuntimeStatus } from "../hooks/useRuntime";
 import { useSettings } from "../hooks/useSettings";
 import { sessionsOfKind } from "../lib/chatGroups";
 import { sessionKind } from "../lib/chat";
@@ -46,7 +46,7 @@ function CatalogBoot() {
 
 function RuntimeBoot() {
   const library = useLibrary();
-  const runtime = useRuntime();
+  const runtime = useRuntimeStatus();
   const { settings } = useSettings();
   const snapshot = runtime.snapshot;
   const failed = useRef<string | null>(null);

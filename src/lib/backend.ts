@@ -6,6 +6,7 @@ import type { HardwareReport } from "./hardware";
 import type { HardwareProfile } from "./profile";
 import type { ChatMessage, ChatSnapshot } from "./chat";
 import type { ChatTurn, RuntimeSnapshot } from "./runtime";
+import type { DebugReport } from "./debug";
 import type { ApiStatus, AppSettings, CodingStatus, ExpertSettings, PerfProfile } from "./settings";
 
 export type AppInfo = {
@@ -137,6 +138,10 @@ export async function removeInstalled(variantId: string): Promise<LibrarySnapsho
 
 export async function getRuntime(): Promise<RuntimeSnapshot> {
   return invoke<RuntimeSnapshot>("get_runtime");
+}
+
+export async function getDebugReport(): Promise<DebugReport> {
+  return invoke<DebugReport>("get_debug_report");
 }
 
 export async function loadRuntime(): Promise<RuntimeSnapshot> {

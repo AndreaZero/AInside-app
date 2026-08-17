@@ -6,6 +6,7 @@ import {
   type WorkspaceHit,
   type WorkspaceNode,
 } from "../../lib/workspace";
+import { isImageRel } from "../../lib/fileKind";
 import { IconChevron, IconFolder } from "../../ui/icons";
 
 export function CodeTree({
@@ -187,7 +188,8 @@ function TreeNode({
         style={{ paddingLeft: 8 + depth * 12 + 22 }}
         onClick={() => onSelect(node.rel)}
       >
-        <span className="code-tree-file">{node.name}</span>
+          <span className="code-tree-file">{node.name}</span>
+          {isImageRel(node.name) ? <span className="code-tree-kind">img</span> : null}
       </button>
     </li>
   );

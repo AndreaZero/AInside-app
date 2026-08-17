@@ -1,10 +1,11 @@
-import { useRuntime } from "../hooks/useRuntime";
+import { useRuntimeStatus } from "../hooks/useRuntime";
 import { cx } from "../lib/cx";
 import { formatProgress } from "../lib/format";
-import type { RuntimeSnapshot } from "../lib/runtime";
+import type { RouteId } from "../navigation/routes";
+import { Button } from "../ui/controls";
 
-export function RuntimeBanner() {
-  const runtime = useRuntime();
+export function RuntimeBanner({ onNavigate }: { onNavigate: (route: RouteId) => void }) {
+  const runtime = useRuntimeStatus();
   const snap = runtime.snapshot;
   if (!snap) return null;
   if (snap.phase !== "motore" && snap.phase !== "avvio" && snap.phase !== "errore") {
@@ -26,6 +27,9 @@ export function RuntimeBanner() {
             {formatProgress(snap.receivedBytes, snap.expectedBytes)}
           </span>
         ) : null}
+        <Button variant="ghost" onClick={() => onNavigate("debug")}>
+          Diagnostica
+        </Button>
       </div>
       {loading ? (
         <p className="runtime-strip-note">
@@ -33,20 +37,6 @@ export function RuntimeBanner() {
           l’app è aperta. Cambiare modello ricarica il file.
         </p>
       ) : null}
-      <RuntimeLoadLog snapshot={snap} />
     </div>
-  );
-}
-
-export function RuntimeLoadLog({ snapshot }: { snapshot: RuntimeSnapshot }) {
-  const detail = (snapshot.log ?? snapshot.errorDetail ?? "").trim();
-  return (
-    <details className="runtime-strip-log" open>
-      <summary>Cosa sta facendo il motore</summary>
-      <pre>
-        {detail ||
-          "Ancora nessuna riga da llama.cpp. Se resta fermo su «preparo il motore», il giro è bloccato prima dell’avvio, oppure l’interfaccia non ha ancora ricevuto l’errore."}
-      </pre>
-    </details>
   );
 }

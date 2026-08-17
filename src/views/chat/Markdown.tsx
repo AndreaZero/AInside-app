@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import {
   parseMarkdown,
   type MdBlock,
@@ -156,13 +156,30 @@ function Block({ block }: { block: MdBlock }) {
   }
 }
 
-export function Markdown({ text, caret }: { text: string; caret?: boolean }) {
+const FrozenBlock = memo(function FrozenBlock({ block }: { block: MdBlock }) {
+  return <Block block={block} />;
+});
+
+export function Markdown({
+  text,
+  caret,
+  streaming,
+}: {
+  text: string;
+  caret?: boolean;
+  streaming?: boolean;
+}) {
   const blocks = parseMarkdown(text);
+  const last = blocks.length - 1;
   return (
     <div className="md">
-      {blocks.map((block, index) => (
-        <Block key={index} block={block} />
-      ))}
+      {blocks.map((block, index) =>
+        streaming && index === last ? (
+          <Block key="tail" block={block} />
+        ) : (
+          <FrozenBlock key={index} block={block} />
+        ),
+      )}
       {caret ? <span className="msg-caret" /> : null}
     </div>
   );

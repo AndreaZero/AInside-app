@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useCatalog } from "../hooks/useCatalog";
 import { useChats } from "../hooks/useChats";
 import { useLibrary, useLibrarySnapshot } from "../hooks/useLibrary";
-import { useRuntime } from "../hooks/useRuntime";
+import { useRuntimeStatus } from "../hooks/useRuntime";
 import { useSettings } from "../hooks/useSettings";
 import { useStickToBottom } from "../hooks/useStickToBottom";
-import { useTokenRate } from "../hooks/useTokenRate";
 import { sessionKind, type ChatMessage } from "../lib/chat";
-import { formatDuration, formatProgress, formatTokenRate } from "../lib/format";
+import { formatProgress } from "../lib/format";
 import { canChat, composerPlaceholder } from "../lib/runtime";
 import { visibleAnswer } from "../lib/think";
 import { webPreviewDoc } from "../lib/webPreview";
@@ -20,6 +19,7 @@ import { EmptyState, ErrorState, InlineAlert } from "../ui/states";
 import { EmptyGlyph } from "../visuals/DownloadRig";
 import { ModelLogo } from "../visuals/ModelLogo";
 import { AssistantMessage, UserBubble } from "./chat/ChatMessage";
+import { LiveAssistant, LiveStatus, StreamSettler } from "./chat/ChatStream";
 import { ComposerThinkTools } from "./chat/ComposerThinkTools";
 import { PreviewHost, PreviewToggle } from "./chat/PreviewPane";
 
@@ -30,7 +30,7 @@ type ChatViewProps = {
 export function ChatView({ onNavigate }: ChatViewProps) {
   const library = useLibrarySnapshot();
   const libraryApi = useLibrary();
-  const runtime = useRuntime();
+  const runtime = useRuntimeStatus();
   const chats = useChats();
   const feedback = useFeedback();
   const { settings, changeThinking } = useSettings();
@@ -50,9 +50,6 @@ export function ChatView({ onNavigate }: ChatViewProps) {
   const [turns, setTurns] = useState<ChatMessage[]>([]);
   const [copied, setCopied] = useState<number | null>(null);
   const [modelOpen, setModelOpen] = useState(false);
-  const pendingReply = useRef(false);
-  const genStarted = useRef<number | null>(null);
-  const [elapsedMs, setElapsedMs] = useState<number | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const snapshot = runtime.snapshot;
   const session = sessionKind(chats.current) === "code" ? null : chats.current;
@@ -64,52 +61,32 @@ export function ChatView({ onNavigate }: ChatViewProps) {
         : undefined,
     [active?.modelId, active?.modelName, active?.variantId],
   );
-  const tokenRate = useTokenRate(runtime.reply, snapshot?.phase === "inRisposta");
-  const log = useStickToBottom(
-    `${currentId}:${turns.length}:${runtime.reply.length}:${snapshot?.phase ?? ""}`,
-  );
+  const log = useStickToBottom();
+  const generating = snapshot?.phase === "inRisposta";
+  const holdLog = useRef(false);
 
   useEffect(() => {
-    if (pendingReply.current) return;
+    if (generating || holdLog.current) return;
     const stored = chats.snapshot?.sessions.find((item) => item.id === currentId);
     setTurns(stored?.messages ?? []);
     runtime.clearReply();
-  }, [currentId, chats.snapshot, runtime.clearReply]);
+  }, [currentId, chats.snapshot, generating, runtime.clearReply]);
 
-  useEffect(() => {
-    if (snapshot?.phase === "inRisposta") {
-      pendingReply.current = true;
-      if (genStarted.current == null) genStarted.current = Date.now();
-      const tick = window.setInterval(() => {
-        if (genStarted.current != null) {
-          setElapsedMs(Date.now() - genStarted.current);
-        }
-      }, 200);
-      return () => window.clearInterval(tick);
-    }
-    if (
-      pendingReply.current &&
-      (snapshot?.phase === "pronto" || snapshot?.phase === "errore")
-    ) {
-      pendingReply.current = false;
-      const durationMs =
-        genStarted.current != null ? Date.now() - genStarted.current : undefined;
-      genStarted.current = null;
-      setElapsedMs(null);
-      if (runtime.reply) {
-        const reply = runtime.reply;
-        setTurns((current) => {
-          const next = [
-            ...current,
-            { role: "assistant" as const, content: reply, durationMs },
-          ];
-          void chats.save(next, model);
-          return next;
+  const onSettle = useCallback(
+    (reply: string, durationMs?: number) => {
+      setTurns((current) => {
+        const next = [
+          ...current,
+          { role: "assistant" as const, content: reply, durationMs },
+        ];
+        void chats.save(next, model).finally(() => {
+          holdLog.current = false;
         });
-      }
-      runtime.clearReply();
-    }
-  }, [snapshot?.phase, runtime.reply, runtime.clearReply, chats, model]);
+        return next;
+      });
+    },
+    [chats, model],
+  );
 
   async function persist(next: ChatMessage[]) {
     setTurns(next);
@@ -122,13 +99,11 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     setInput("");
     if (area.current) area.current.style.height = "32px";
     log.pin();
-    genStarted.current = Date.now();
-    setElapsedMs(0);
+    holdLog.current = true;
     const next: ChatMessage[] = [...turns, { role: "user", content: text }];
-    pendingReply.current = true;
     await persist(next);
     await runtime.send(next).catch(() => {
-      pendingReply.current = false;
+      holdLog.current = false;
     });
   }
 
@@ -138,13 +113,11 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     if (last?.role !== "assistant") return;
     const next = turns.slice(0, -1);
     log.pin();
-    genStarted.current = Date.now();
-    setElapsedMs(0);
-    pendingReply.current = true;
+    holdLog.current = true;
     runtime.clearReply();
     await persist(next);
     await runtime.send(next).catch(() => {
-      pendingReply.current = false;
+      holdLog.current = false;
     });
   }
 
@@ -204,12 +177,9 @@ export function ChatView({ onNavigate }: ChatViewProps) {
       break;
     }
   }
-  const streamingDoc = runtime.reply ? webPreviewDoc(visibleAnswer(runtime.reply)) : null;
   const storedDoc = lastAssistantText
     ? webPreviewDoc(visibleAnswer(lastAssistantText))
     : null;
-  const previewDoc = streamingDoc ?? storedDoc;
-  const previewLive = Boolean(streamingDoc && snapshot?.phase === "inRisposta");
   const readyModels = library.items.filter((item) => item.status === "pronto");
   const localeKind =
     snapshot?.phase === "inRisposta" || snapshot?.phase === "pronto"
@@ -223,7 +193,7 @@ export function ChatView({ onNavigate }: ChatViewProps) {
   return (
     <section className="page page--fill">
       <div className="chat-shell">
-        <PreviewHost doc={previewDoc} live={previewLive} resetKey={currentId}>
+        <PreviewHost doc={storedDoc} live={false} resetKey={currentId}>
         <div className="chat-main">
           <header className="chat-head">
             <div className="chat-head-meta">
@@ -319,7 +289,8 @@ export function ChatView({ onNavigate }: ChatViewProps) {
           )}
 
           <div className="chat-log" aria-live="polite" ref={log.ref} onScroll={log.onScroll}>
-            {turns.length === 0 && !runtime.reply && snapshot?.phase !== "inRisposta" && (
+            <div className="chat-log-inner" ref={log.innerRef}>
+            {turns.length === 0 && !generating && (
               <p className="page-note">
                 {snapshot?.phase === "motore" || snapshot?.phase === "avvio"
                   ? snapshot.message
@@ -352,31 +323,12 @@ export function ChatView({ onNavigate }: ChatViewProps) {
                 />
               ),
             )}
-            {runtime.reply ? (
-              <AssistantMessage
-                text={runtime.reply}
-                streaming
-                showThinking={showThinking}
-                durationMs={elapsedMs}
-              />
-            ) : snapshot?.phase === "inRisposta" ? (
-              <AssistantMessage
-                text="Sto preparando la risposta…"
-                streaming
-                showThinking={showThinking}
-                durationMs={elapsedMs}
-              />
-            ) : null}
+            <LiveAssistant showThinking={showThinking} />
+            </div>
           </div>
 
           <div className="chat-composer-wrap">
-            {snapshot?.phase === "inRisposta" && (
-              <div className="chat-status-line">
-                <span>{thinkingOn ? "Ragionamento acceso · generazione…" : "Generazione in corso…"}</span>
-                <span>{formatDuration(elapsedMs)}</span>
-                <span>{formatTokenRate(tokenRate)}</span>
-              </div>
-            )}
+            <LiveStatus thinkingOn={thinkingOn} />
             {(snapshot?.phase === "avvio" ||
               snapshot?.phase === "motore" ||
               snapshot?.phase === "errore") && (
@@ -431,6 +383,7 @@ export function ChatView({ onNavigate }: ChatViewProps) {
             </form>
           </div>
         </div>
+        <StreamSettler onSettle={onSettle} />
         </PreviewHost>
       </div>
     </section>

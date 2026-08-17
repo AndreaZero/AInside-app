@@ -1,57 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { htmlSnippetDoc, isWebLang, looksLikeHtml } from "../../lib/webPreview";
+import { highlight } from "../../lib/syntax";
 import { Button } from "../../ui/controls";
 import { IconCopy, IconEye } from "../../ui/icons";
 import { usePreview } from "./PreviewPane";
-
-function tokenize(code: string, lang: string | null): ReactNode[] {
-  const kind = (lang ?? "").toLowerCase();
-  const pattern =
-    kind === "html" || kind === "htm" || kind === "svg" || kind === "xml"
-      ? /(<!--[\s\S]*?-->|<\/?[a-zA-Z][\w:-]*|\/?>|"[^"]*"|'[^']*')/g
-      : kind === "css"
-        ? /(\/\*[\s\S]*?\*\/|[a-zA-Z-]+(?=\s*:)|:[^;{}]+|#(?:[0-9a-fA-F]{3,8})|"[^"]*"|'[^']*')/g
-        : kind === "js" ||
-            kind === "javascript" ||
-            kind === "ts" ||
-            kind === "jsx" ||
-            kind === "tsx"
-          ? /(\/\/.*$|\/\*[\s\S]*?\*\/|"[^"]*"|'[^']*'|`[^`]*`|\b(?:const|let|var|function|return|if|else|for|while|class|import|export|from|new|await|async)\b)/gm
-          : null;
-  if (!pattern) return [code];
-
-  const parts: ReactNode[] = [];
-  let last = 0;
-  let match: RegExpExecArray | null;
-  let i = 0;
-  while ((match = pattern.exec(code))) {
-    if (match.index > last) parts.push(code.slice(last, match.index));
-    const token = match[0];
-    const cls =
-      token.startsWith("<!--") || token.startsWith("//") || token.startsWith("/*")
-        ? "is-comment"
-        : token.startsWith("<")
-          ? "is-tag"
-          : token.startsWith("\"") || token.startsWith("'") || token.startsWith("`")
-            ? "is-str"
-            : /^(const|let|var|function|return|if|else|for|while|class|import|export|from|new|await|async)$/.test(
-                token,
-              )
-              ? "is-kw"
-              : token.startsWith("#") || token.startsWith(":")
-                ? "is-val"
-                : "is-name";
-    parts.push(
-      <span key={i} className={cls}>
-        {token}
-      </span>,
-    );
-    i += 1;
-    last = match.index + token.length;
-  }
-  if (last < code.length) parts.push(code.slice(last));
-  return parts;
-}
 
 export function CodeBlock({
   lang,
@@ -99,7 +51,7 @@ export function CodeBlock({
         </div>
       </header>
       <pre className="msg-code">
-        <code>{tokenize(code, lang)}</code>
+        <code>{highlight(code, lang)}</code>
       </pre>
     </figure>
   );

@@ -233,6 +233,15 @@ export function IconRows(props: IconProps) {
   );
 }
 
+export function IconTerminal(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3.5" y="5" width="17" height="14" rx="2" />
+      <path d="m7.5 9.5 3 2.5-3 2.5M12.5 15.5h4" />
+    </Svg>
+  );
+}
+
 export function IconCode(props: IconProps) {
   return (
     <Svg {...props}>

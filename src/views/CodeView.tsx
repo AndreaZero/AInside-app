@@ -104,9 +104,7 @@ export function CodeView({ onNavigate }: CodeViewProps) {
     [active?.modelId, active?.modelName, active?.variantId],
   );
   const tokenRate = useTokenRate(runtime.reply, snapshot?.phase === "inRisposta");
-  const log = useStickToBottom(
-    `${currentId}:${turns.length}:${runtime.reply.length}:${snapshot?.phase ?? ""}`,
-  );
+  const log = useStickToBottom();
   const catalogModel =
     catalog.status === "ready" && active
       ? catalog.catalog.models.find((item) => item.id === active.modelId)
@@ -822,6 +820,7 @@ export function CodeView({ onNavigate }: CodeViewProps) {
             ref={log.ref}
             onScroll={log.onScroll}
           >
+            <div className="chat-log-inner" ref={log.innerRef}>
             {preview || previewError ? (
               <CodePreview
                 file={preview}
@@ -898,6 +897,7 @@ export function CodeView({ onNavigate }: CodeViewProps) {
             ) : null}
               </>
             )}
+            </div>
           </div>
 
           <div className="chat-composer-wrap code-composer">

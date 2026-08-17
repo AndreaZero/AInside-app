@@ -1,8 +1,10 @@
-import { useLayoutEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-export function useStickToBottom(trigger: unknown) {
+export function useStickToBottom() {
   const ref = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
+  const raf = useRef(0);
+  const [inner, setInner] = useState<HTMLDivElement | null>(null);
 
   function onScroll() {
     const el = ref.current;
@@ -16,12 +18,27 @@ export function useStickToBottom(trigger: unknown) {
     if (el) el.scrollTop = el.scrollHeight;
   }
 
-  useLayoutEffect(() => {
-    if (!stick.current) return;
-    const el = ref.current;
-    if (!el) return;
-    el.scrollTop = el.scrollHeight;
-  }, [trigger]);
+  useEffect(() => {
+    const scroller = ref.current;
+    if (!scroller || !inner) return;
 
-  return { ref, onScroll, pin };
+    const follow = () => {
+      raf.current = 0;
+      if (!stick.current) return;
+      scroller.scrollTop = scroller.scrollHeight;
+    };
+
+    const ro = new ResizeObserver(() => {
+      if (raf.current) return;
+      raf.current = requestAnimationFrame(follow);
+    });
+    ro.observe(inner);
+    follow();
+    return () => {
+      ro.disconnect();
+      if (raf.current) cancelAnimationFrame(raf.current);
+    };
+  }, [inner]);
+
+  return { ref, innerRef: setInner, onScroll, pin };
 }

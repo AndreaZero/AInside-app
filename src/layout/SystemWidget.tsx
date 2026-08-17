@@ -1,5 +1,5 @@
 import { useHardwareProfile } from "../hooks/useHardwareProfile";
-import { useRuntime } from "../hooks/useRuntime";
+import { useRuntimeStatus } from "../hooks/useRuntime";
 import { cx } from "../lib/cx";
 import { formatGb } from "../lib/format";
 import { performanceFill, ramUsedRatio, runtimeActivity } from "../lib/resources";
@@ -7,7 +7,7 @@ import { ProgressBar } from "../ui/controls";
 
 export function SystemWidget() {
   const machine = useHardwareProfile();
-  const runtime = useRuntime();
+  const runtime = useRuntimeStatus();
   const activity = runtimeActivity(runtime.snapshot?.phase);
 
   if (machine.status !== "ready") {

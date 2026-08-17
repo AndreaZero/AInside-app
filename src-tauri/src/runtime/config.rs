@@ -1,4 +1,6 @@
-//! Stima memoria e adatta context → batch → offload. I profili cambiano quanto del PC usiamo.
+//! Stima memoria e adatta context → batch → KV → offload. I profili cambiano quanto del PC usiamo.
+
+use std::path::Path;
 
 use crate::hardware::HardwareReport;
 use crate::settings::{ExpertSettings, PerfProfile};
@@ -20,6 +22,7 @@ pub struct LaunchConfig {
     pub port: u16,
     pub flash: bool,
     pub cache_type: Option<String>,
+    pub mtp: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -55,10 +58,12 @@ pub fn plan_with_reclaim(
     let mut context = start_context(profile);
     let mut batch = start_batch(profile);
     let mut ngl: u32 = if kind == EngineKind::Cpu { 0 } else { 99 };
+    let mut cache_type: Option<String> = None;
     let threads = thread_count(hardware, profile);
+    let gpu = kind != EngineKind::Cpu;
 
     for _ in 0..24 {
-        let est = estimate(weights, context, batch, ngl, kind);
+        let est = estimate(weights, context, batch, ngl, kind, cache_type.as_deref());
         if est.fits(&budget) {
             let config = LaunchConfig {
                 context,
@@ -66,18 +71,21 @@ pub fn plan_with_reclaim(
                 gpu_layers: ngl.to_string(),
                 threads,
                 port: INTERNAL_PORT,
-                flash: false,
-                cache_type: None,
+                flash: gpu && ngl > 0,
+                cache_type: cache_type.clone(),
+                mtp: false,
             };
             return Ok(LaunchPlan {
                 outcome: outcome_it(profile, kind, ngl, context, start_context(profile), &est, &budget),
                 detail: format!(
-                    "profilo={} context={} batch={} ngl={} thread={} ram~{} vram~{} liberi={} recupero={} mmap={}",
+                    "profilo={} context={} batch={} ngl={} thread={} flash={} kv={} ram~{} vram~{} liberi={} recupero={} mmap={}",
                     profile.label_it(),
                     context,
                     batch,
                     ngl,
                     threads,
+                    config.flash,
+                    cache_type.as_deref().unwrap_or("f16"),
                     human(est.ram),
                     human(est.vram),
                     human(budget.free),
@@ -96,6 +104,10 @@ pub fn plan_with_reclaim(
         }
         if batch > 128 {
             batch = next_batch(batch);
+            continue;
+        }
+        if gpu && ngl > 0 && cache_type.is_none() {
+            cache_type = Some("q8_0".into());
             continue;
         }
         if ngl > 0 {
@@ -157,7 +169,7 @@ fn refuse_msg(
     budget: &Budget,
 ) -> String {
     let ngl = if kind == EngineKind::Cpu { 0 } else { 35 };
-    let need = estimate(weights, MIN_CONTEXT, 128, ngl, kind);
+    let need = estimate(weights, MIN_CONTEXT, 128, ngl, kind, None);
     let total = hardware.memory.total_bytes.unwrap_or(0);
     let available = hardware.memory.available_bytes.unwrap_or(0);
     let other = if reclaim > 0 {
@@ -232,9 +244,9 @@ impl Budget {
             .unwrap_or(0);
 
         let (ram_use, vram_use, leave) = match profile {
-            PerfProfile::Risparmio => (48, 58, ram_total / 3),
-            PerfProfile::Bilanciato => (62, 78, ram_total / 4),
-            PerfProfile::Massime => (75, 90, ram_total / 6),
+            PerfProfile::Risparmio => (48, 72, ram_total / 3),
+            PerfProfile::Bilanciato => (62, 88, ram_total / 4),
+            PerfProfile::Massime => (75, 94, ram_total / 6),
         };
         let leave = leave.max(2 * GIB);
         let by_profile = ram_total.saturating_mul(ram_use) / 100;
@@ -251,13 +263,20 @@ impl Budget {
     }
 }
 
-fn estimate(weights: u64, context: u32, batch: u32, ngl: u32, kind: EngineKind) -> Estimate {
-    let kv = kv_bytes(weights, context);
+fn estimate(
+    weights: u64,
+    context: u32,
+    batch: u32,
+    ngl: u32,
+    kind: EngineKind,
+    cache: Option<&str>,
+) -> Estimate {
+    let kv = kv_bytes(weights, context, cache);
     let batch_mem = (batch as u64)
         .saturating_mul(2 * MIB)
         .max(64 * MIB);
     let ram_overhead = 1400 * MIB;
-    let vram_overhead = 768 * MIB;
+    let vram_overhead = 512 * MIB;
 
     if kind == EngineKind::Cpu || ngl == 0 {
         return Estimate {
@@ -286,9 +305,39 @@ fn estimate(weights: u64, context: u32, batch: u32, ngl: u32, kind: EngineKind) 
     }
 }
 
-fn kv_bytes(weights: u64, context: u32) -> u64 {
+fn kv_bytes(weights: u64, context: u32, cache: Option<&str>) -> u64 {
     let at_4k = (weights / 12).clamp(192 * MIB, 3 * GIB);
-    at_4k.saturating_mul(context as u64) / 4096
+    let raw = at_4k.saturating_mul(context as u64) / 4096;
+    match cache {
+        Some("q4_0") => raw / 4,
+        Some("q8_0") => raw / 2,
+        _ => raw,
+    }
+}
+
+pub fn model_has_mtp(model_id: &str, model_name: &str, path: &Path) -> bool {
+    let blob = format!(
+        "{} {} {}",
+        model_id,
+        model_name,
+        path.to_string_lossy()
+    )
+    .to_ascii_lowercase();
+    blob.contains("qwen38") || blob.contains("qwen 3.8") || blob.contains("qwen3.8")
+}
+
+pub fn next_relaxed(cfg: &LaunchConfig) -> Option<LaunchConfig> {
+    if cfg.mtp {
+        let mut next = cfg.clone();
+        next.mtp = false;
+        return Some(next);
+    }
+    if cfg.flash {
+        let mut next = cfg.clone();
+        next.flash = false;
+        return Some(next);
+    }
+    None
 }
 
 fn start_context(profile: PerfProfile) -> u32 {
@@ -430,6 +479,8 @@ mod tests {
         assert_eq!(plan.config.gpu_layers, "99");
         assert_eq!(plan.config.context, 4096);
         assert_eq!(plan.config.threads, 15);
+        assert!(plan.config.flash);
+        assert!(!plan.config.mtp);
         assert!(plan.outcome.contains("scheda"));
     }
 
@@ -448,7 +499,7 @@ mod tests {
             &hw(32, 12, 16, true),
             EngineKind::Vulkan,
             PerfProfile::Massime,
-            8 * GIB,
+            10 * GIB,
         )
         .unwrap();
         assert_eq!(plan.config.gpu_layers, "99");
@@ -465,6 +516,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(plan.config.gpu_layers, "0");
+        assert!(!plan.config.flash);
         assert!(plan.outcome.contains("processore"));
     }
 
@@ -544,5 +596,53 @@ mod tests {
         let next = apply_expert(planned, &expert);
         assert_eq!(next.config.context, 2048);
         assert!(next.outcome.contains("regolato da te"));
+    }
+
+    #[test]
+    fn twelve_gb_card_keeps_a_nine_gb_model_on_the_gpu() {
+        let plan = plan(
+            &hw(32, 12, 16, true),
+            EngineKind::Vulkan,
+            PerfProfile::Bilanciato,
+            9 * GIB,
+        )
+        .unwrap();
+        assert_eq!(plan.config.gpu_layers, "99");
+        assert!(plan.config.flash);
+        assert!(plan.outcome.contains("scheda"));
+    }
+
+    #[test]
+    fn qwen38_has_mtp_others_do_not() {
+        assert!(model_has_mtp(
+            "qwen38-27b",
+            "Qwen 3.8",
+            Path::new("C:/models/Qwen3.8-27B-Q4_K_M.gguf")
+        ));
+        assert!(!model_has_mtp(
+            "qwen35-9b",
+            "Qwen 3.5",
+            Path::new("C:/models/Qwen3.5-9B-Q4_K_M.gguf")
+        ));
+    }
+
+    #[test]
+    fn relaxes_mtp_before_flash() {
+        let cfg = LaunchConfig {
+            context: 4096,
+            batch: 512,
+            gpu_layers: "99".into(),
+            threads: 8,
+            port: INTERNAL_PORT,
+            flash: true,
+            cache_type: None,
+            mtp: true,
+        };
+        let no_mtp = next_relaxed(&cfg).unwrap();
+        assert!(!no_mtp.mtp);
+        assert!(no_mtp.flash);
+        let no_flash = next_relaxed(&no_mtp).unwrap();
+        assert!(!no_flash.flash);
+        assert!(next_relaxed(&no_flash).is_none());
     }
 }

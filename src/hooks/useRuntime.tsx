@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -18,9 +19,8 @@ import {
 } from "../lib/backend";
 import type { ChatTurn, RuntimeSnapshot, TokenChunk } from "../lib/runtime";
 
-type RuntimeApi = {
+type RuntimeStatus = {
   snapshot: RuntimeSnapshot | null;
-  reply: string;
   error: string | null;
   load: () => Promise<void>;
   unload: () => Promise<void>;
@@ -34,12 +34,36 @@ type RuntimeApi = {
   clearReply: () => void;
 };
 
-const RuntimeContext = createContext<RuntimeApi | null>(null);
+type RuntimeApi = RuntimeStatus & { reply: string };
+
+const StatusContext = createContext<RuntimeStatus | null>(null);
+const ReplyContext = createContext("");
 
 export function RuntimeProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<RuntimeSnapshot | null>(null);
   const [reply, setReply] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const pending = useRef("");
+  const raf = useRef(0);
+
+  const dropQueued = useCallback(() => {
+    pending.current = "";
+    if (raf.current) {
+      cancelAnimationFrame(raf.current);
+      raf.current = 0;
+    }
+  }, []);
+
+  const takeQueued = useCallback(() => {
+    const chunk = pending.current;
+    dropQueued();
+    return chunk;
+  }, [dropQueued]);
+
+  const resetReply = useCallback(() => {
+    dropQueued();
+    setReply("");
+  }, [dropQueued]);
 
   useEffect(() => {
     let alive = true;
@@ -57,20 +81,29 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
       });
 
     const unlistenStatus = listen<RuntimeSnapshot>("runtime-update", (event) => {
+      const chunk = takeQueued();
+      if (chunk) setReply((current) => current + chunk);
       setSnapshot(event.payload);
     });
     const unlistenToken = listen<TokenChunk>("runtime-token", (event) => {
-      if (event.payload.text) {
-        setReply((current) => current + event.payload.text);
-      }
+      if (!event.payload.text) return;
+      pending.current += event.payload.text;
+      if (raf.current) return;
+      raf.current = requestAnimationFrame(() => {
+        raf.current = 0;
+        const chunk = pending.current;
+        pending.current = "";
+        if (chunk) setReply((current) => current + chunk);
+      });
     });
 
     return () => {
       alive = false;
+      dropQueued();
       void unlistenStatus.then((stop) => stop());
       void unlistenToken.then((stop) => stop());
     };
-  }, []);
+  }, [dropQueued, takeQueued]);
 
   const load = useCallback(async () => {
     try {
@@ -93,16 +126,16 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
     try {
       await unloadRuntime();
       setSnapshot(await getRuntime());
-      setReply("");
+      resetReply();
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Non fermo il modello.");
     }
-  }, []);
+  }, [resetReply]);
 
   const send = useCallback(async (messages: ChatTurn[]) => {
     try {
-      setReply("");
+      resetReply();
       setSnapshot(await startCompletion(messages));
       setError(null);
     } catch (err) {
@@ -110,12 +143,12 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
       setError(message);
       throw new Error(message);
     }
-  }, []);
+  }, [resetReply]);
 
   const sendCoding = useCallback(
     async (input: { messages: ChatTurn[]; workspace: string; cited?: string[] }) => {
       try {
-        setReply("");
+        resetReply();
         setSnapshot(await startCodingTurn(input));
         setError(null);
       } catch (err) {
@@ -124,31 +157,54 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
         throw new Error(message);
       }
     },
-    [],
+    [resetReply],
   );
 
   const stop = useCallback(async () => {
     try {
+      const chunk = takeQueued();
+      if (chunk) setReply((current) => current + chunk);
       setSnapshot(await stopCompletion());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Non fermo la risposta.");
     }
-  }, []);
+  }, [takeQueued]);
 
-  const clearReply = useCallback(() => setReply(""), []);
-
-  const value = useMemo<RuntimeApi>(
-    () => ({ snapshot, reply, error, load, unload, send, sendCoding, stop, clearReply }),
-    [snapshot, reply, error, load, unload, send, sendCoding, stop, clearReply],
+  const status = useMemo<RuntimeStatus>(
+    () => ({
+      snapshot,
+      error,
+      load,
+      unload,
+      send,
+      sendCoding,
+      stop,
+      clearReply: resetReply,
+    }),
+    [snapshot, error, load, unload, send, sendCoding, stop, resetReply],
   );
 
-  return <RuntimeContext.Provider value={value}>{children}</RuntimeContext.Provider>;
+  return (
+    <StatusContext.Provider value={status}>
+      <ReplyContext.Provider value={reply}>{children}</ReplyContext.Provider>
+    </StatusContext.Provider>
+  );
 }
 
-export function useRuntime(): RuntimeApi {
-  const ctx = useContext(RuntimeContext);
+export function useRuntimeStatus(): RuntimeStatus {
+  const ctx = useContext(StatusContext);
   if (!ctx) {
     throw new Error("useRuntime richiede RuntimeProvider");
   }
   return ctx;
+}
+
+export function useRuntimeReply(): string {
+  return useContext(ReplyContext);
+}
+
+export function useRuntime(): RuntimeApi {
+  const status = useRuntimeStatus();
+  const reply = useRuntimeReply();
+  return { ...status, reply };
 }

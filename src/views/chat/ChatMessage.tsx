@@ -1,14 +1,15 @@
+import { memo } from "react";
 import { formatDuration } from "../../lib/format";
 import { isUsefulThink, splitThink, visibleAnswer } from "../../lib/think";
 import { Button } from "../../ui/controls";
 import { IconCopy, IconRefresh } from "../../ui/icons";
 import { Markdown } from "./Markdown";
 
-export function UserBubble({ text }: { text: string }) {
+export const UserBubble = memo(function UserBubble({ text }: { text: string }) {
   return <p className="msg-user">{text}</p>;
-}
+});
 
-export function AssistantMessage({
+export const AssistantMessage = memo(function AssistantMessage({
   text,
   streaming,
   onCopy,
@@ -32,7 +33,7 @@ export function AssistantMessage({
   const time = formatDuration(durationMs);
 
   return (
-    <div className="msg-assistant">
+    <div className={streaming ? "msg-assistant is-live" : "msg-assistant"}>
       {revealThink && (
         <details
           className="msg-think"
@@ -51,7 +52,7 @@ export function AssistantMessage({
       {waiting ? (
         <Markdown text="Sto preparando la risposta…" caret />
       ) : answer.trim() ? (
-        <Markdown text={answer} caret={streaming && !thinkingOpen} />
+        <Markdown text={answer} caret={streaming && !thinkingOpen} streaming={streaming} />
       ) : null}
       {(time || onCopy || onRegenerate) && !streaming && (
         <div className="msg-foot">
@@ -77,4 +78,4 @@ export function AssistantMessage({
       {streaming && time ? <p className="msg-time is-live">{time}</p> : null}
     </div>
   );
-}
+});

@@ -18,11 +18,14 @@ const SKIP_NAMES: &[&str] = &[
     "thumbs.db",
 ];
 
+const IMAGE_EXTS: &[&str] = &[
+    "png", "jpg", "jpeg", "gif", "webp", "ico", "bmp", "svg", "avif", "tif", "tiff",
+];
+
 const SKIP_EXTS: &[&str] = &[
-    "png", "jpg", "jpeg", "gif", "webp", "ico", "bmp", "exe", "dll", "so", "dylib", "wasm",
-    "zip", "7z", "gz", "rar", "pdf", "woff", "woff2", "ttf", "eot", "mp3", "mp4", "webm",
-    "ogg", "wav", "sqlite", "bin", "pyc", "class", "o", "obj", "lib", "pdb", "gguf",
-    "safetensors", "onnx",
+    "exe", "dll", "so", "dylib", "wasm", "zip", "7z", "gz", "rar", "pdf", "woff", "woff2",
+    "ttf", "eot", "mp3", "mp4", "webm", "ogg", "wav", "sqlite", "bin", "pyc", "class", "o",
+    "obj", "lib", "pdb", "gguf", "safetensors", "onnx",
 ];
 
 pub fn skip_name(name: &str) -> bool {
@@ -30,8 +33,29 @@ pub fn skip_name(name: &str) -> bool {
     SKIP_NAMES.iter().any(|item| *item == lower)
 }
 
+pub fn is_image_name(name: &str) -> bool {
+    ext(name).is_some_and(|item| IMAGE_EXTS.contains(&item.as_str()))
+}
+
+pub fn image_mime(name: &str) -> Option<&'static str> {
+    match ext(name)?.as_str() {
+        "png" => Some("image/png"),
+        "jpg" | "jpeg" => Some("image/jpeg"),
+        "gif" => Some("image/gif"),
+        "webp" => Some("image/webp"),
+        "ico" => Some("image/x-icon"),
+        "bmp" => Some("image/bmp"),
+        "svg" => Some("image/svg+xml"),
+        "avif" => Some("image/avif"),
+        "tif" | "tiff" => Some("image/tiff"),
+        _ => None,
+    }
+}
+
 pub fn looks_binary_name(name: &str) -> bool {
-    ext(name).is_some_and(|item| SKIP_EXTS.contains(&item.as_str()))
+    ext(name).is_some_and(|item| {
+        SKIP_EXTS.contains(&item.as_str()) || IMAGE_EXTS.contains(&item.as_str())
+    })
 }
 
 pub fn is_secret_name(name: &str) -> bool {
@@ -156,5 +180,13 @@ mod tests {
         assert!(is_secret_name(".env.local"));
         assert!(is_secret_name("key.pem"));
         assert!(!is_secret_name("app.ts"));
+    }
+
+    #[test]
+    fn images() {
+        assert!(is_image_name("logo.PNG"));
+        assert!(is_image_name("favicon.ico"));
+        assert_eq!(image_mime("icon.svg"), Some("image/svg+xml"));
+        assert!(!is_image_name("app.ts"));
     }
 }

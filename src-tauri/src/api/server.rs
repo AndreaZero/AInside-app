@@ -336,7 +336,8 @@ mod tests {
             &ExpertSettings::default(),
             false,
         );
-        assert_eq!(body["reasoning_effort"], "none");
+        assert!(body.get("reasoning_effort").is_none());
+        assert_eq!(body["reasoning_budget"], 0);
         assert_eq!(body["chat_template_kwargs"]["enable_thinking"], false);
         assert_eq!(body["max_tokens"], 1024);
         assert_eq!(body["temperature"], 0.7);

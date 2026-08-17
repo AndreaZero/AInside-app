@@ -17,12 +17,13 @@ use std::path::{Path, PathBuf};
 
 use serde::Serialize;
 
-use ignore::{ignored, is_secret_name, load_gitignore, looks_binary_name, skip_name};
+use ignore::{ignored, image_mime, is_image_name, is_secret_name, load_gitignore, looks_binary_name, skip_name};
 use paths::{rel_from, resolve_inside};
 
 const MAX_DEPTH: u32 = 8;
 const MAX_NODES: usize = 700;
 const MAX_READ: usize = 64 * 1024;
+const MAX_IMAGE: usize = 8 * 1024 * 1024;
 const MAX_SEARCH_HITS: usize = 40;
 const MAX_SEARCH_FILES: usize = 500;
 const MAX_SEARCH_FILE_BYTES: u64 = 256 * 1024;
@@ -50,6 +51,11 @@ pub struct WorkspaceFile {
     pub rel: String,
     pub text: String,
     pub truncated: bool,
+    pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub mime: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -102,6 +108,9 @@ pub fn read_rel(root: &str, rel: &str) -> Result<WorkspaceFile, String> {
         .file_name()
         .and_then(|item| item.to_str())
         .unwrap_or_default();
+    if is_image_name(name) {
+        return read_image(&root_path, &path, name);
+    }
     if looks_binary_name(name) {
         return Err("Questo file non è testo.".into());
     }
@@ -113,11 +122,71 @@ pub fn read_rel(root: &str, rel: &str) -> Result<WorkspaceFile, String> {
     let slice = if truncated { &bytes[..MAX_READ] } else { &bytes };
     let text = String::from_utf8(slice.to_vec())
         .map_err(|_| "Questo file non è testo.".to_string())?;
-    Ok(WorkspaceFile {
-        rel: rel_from(&root_path, &path),
+    Ok(text_file(rel_from(&root_path, &path), text, truncated))
+}
+
+fn text_file(rel: String, text: String, truncated: bool) -> WorkspaceFile {
+    WorkspaceFile {
+        rel,
         text,
         truncated,
+        kind: "text".into(),
+        mime: None,
+        data_url: None,
+    }
+}
+
+fn read_image(root: &Path, path: &Path, name: &str) -> Result<WorkspaceFile, String> {
+    let mime = image_mime(name).unwrap_or("application/octet-stream");
+    let bytes = fs::read(path).map_err(|_| "Non riesco a leggere questo file.".to_string())?;
+    let truncated = bytes.len() > MAX_IMAGE;
+    let data_url = if truncated {
+        None
+    } else {
+        Some(format!("data:{mime};base64,{}", to_base64(&bytes)))
+    };
+    let text = if mime == "image/svg+xml" {
+        let slice = if bytes.len() > MAX_READ {
+            &bytes[..MAX_READ]
+        } else {
+            &bytes
+        };
+        String::from_utf8_lossy(slice).into_owned()
+    } else {
+        String::new()
+    };
+    Ok(WorkspaceFile {
+        rel: rel_from(root, path),
+        text,
+        truncated,
+        kind: "image".into(),
+        mime: Some(mime.into()),
+        data_url,
     })
+}
+
+fn to_base64(bytes: &[u8]) -> String {
+    const TABLE: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity((bytes.len() + 2) / 3 * 4);
+    for chunk in bytes.chunks(3) {
+        let a = chunk[0] as u32;
+        let b = chunk.get(1).copied().unwrap_or(0) as u32;
+        let c = chunk.get(2).copied().unwrap_or(0) as u32;
+        let n = (a << 16) | (b << 8) | c;
+        out.push(TABLE[(n >> 18) as usize] as char);
+        out.push(TABLE[((n >> 12) & 63) as usize] as char);
+        out.push(if chunk.len() > 1 {
+            TABLE[((n >> 6) & 63) as usize] as char
+        } else {
+            '='
+        });
+        out.push(if chunk.len() > 2 {
+            TABLE[(n & 63) as usize] as char
+        } else {
+            '='
+        });
+    }
+    out
 }
 
 #[tauri::command]
@@ -339,6 +408,25 @@ mod tests {
         let hits = workspace_search(root.clone(), "hello search".into()).expect("search");
         assert!(hits.iter().any(|h| h.rel == "src/app.ts"));
         assert!(workspace_read(root, "../app.ts".into()).is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_png() {
+        let dir = sandbox();
+        let png: &[u8] = &[
+            137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1,
+            8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0, 1, 0, 0,
+            5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
+        ];
+        fs::write(dir.join("src/dot.png"), png).unwrap();
+        let file = workspace_read(dir.to_string_lossy().into_owned(), "src/dot.png".into()).expect("png");
+        assert_eq!(file.kind, "image");
+        assert!(file
+            .data_url
+            .as_deref()
+            .unwrap_or_default()
+            .starts_with("data:image/png;base64,"));
         let _ = fs::remove_dir_all(&dir);
     }
 }

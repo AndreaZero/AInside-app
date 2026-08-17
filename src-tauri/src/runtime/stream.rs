@@ -232,21 +232,26 @@ pub enum StreamDelta {
 }
 
 pub fn apply_thinking(body: &mut Value, thinking: bool) {
-    if body.get("chat_template_kwargs").is_none() {
-        body["chat_template_kwargs"] = json!({ "enable_thinking": thinking });
+    let mut kwargs = match body.get("chat_template_kwargs") {
+        Some(Value::Object(map)) => Value::Object(map.clone()),
+        _ => json!({}),
+    };
+    if kwargs.get("enable_thinking").is_none() {
+        kwargs["enable_thinking"] = json!(thinking);
     }
+    // Qwen 3.8 accetta solo xhigh | medium | low. "none" fa ignorare il template
+    // e il modello resta su xhigh, anche se in UI il ragionamento è spento.
     if thinking {
+        if kwargs.get("reasoning_effort").is_none() {
+            kwargs["reasoning_effort"] = json!("medium");
+        }
         if body.get("reasoning_budget").is_none() {
             body["reasoning_budget"] = json!(THINK_BUDGET);
         }
-    } else {
-        if body.get("reasoning_effort").is_none() {
-            body["reasoning_effort"] = json!("none");
-        }
-        if body.get("reasoning_budget").is_none() {
-            body["reasoning_budget"] = json!(0);
-        }
+    } else if body.get("reasoning_budget").is_none() {
+        body["reasoning_budget"] = json!(0);
     }
+    body["chat_template_kwargs"] = kwargs;
 }
 
 pub fn thinking_should_stop(buf: &str) -> bool {
@@ -473,6 +478,25 @@ mod tests {
             take_deltas(line),
             vec![StreamDelta::Thinking("ok".into())]
         );
+    }
+
+    #[test]
+    fn thinking_off_disables_template_without_invalid_effort() {
+        let mut body = json!({ "messages": [] });
+        apply_thinking(&mut body, false);
+        assert_eq!(body["chat_template_kwargs"]["enable_thinking"], false);
+        assert_eq!(body["reasoning_budget"], 0);
+        assert!(body.get("reasoning_effort").is_none());
+        assert!(body["chat_template_kwargs"].get("reasoning_effort").is_none());
+    }
+
+    #[test]
+    fn thinking_on_uses_medium_not_xhigh() {
+        let mut body = json!({ "messages": [] });
+        apply_thinking(&mut body, true);
+        assert_eq!(body["chat_template_kwargs"]["enable_thinking"], true);
+        assert_eq!(body["chat_template_kwargs"]["reasoning_effort"], "medium");
+        assert_eq!(body["reasoning_budget"], THINK_BUDGET);
     }
 
     #[test]

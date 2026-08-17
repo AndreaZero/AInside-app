@@ -42,13 +42,9 @@ impl ServerProcess {
             .arg("-ngl")
             .arg(&cfg.gpu_layers)
             .arg("-t")
-            .arg(cfg.threads.to_string())
-            .arg("--no-webui");
-        if cfg.flash {
-            command.arg("-fa").arg("on");
-        }
-        if let Some(cache) = &cfg.cache_type {
-            command.arg("-ctk").arg(cache).arg("-ctv").arg(cache);
+            .arg(cfg.threads.to_string());
+        for flag in extra_flags(cfg) {
+            command.arg(flag);
         }
         command
             .stdin(Stdio::null())
@@ -103,6 +99,25 @@ impl Drop for ServerProcess {
     fn drop(&mut self) {
         self.kill();
     }
+}
+
+pub(crate) fn extra_flags(cfg: &LaunchConfig) -> Vec<String> {
+    let mut flags = vec!["--no-webui".into(), "--jinja".into()];
+    if cfg.flash {
+        flags.extend(["-fa".into(), "on".into()]);
+    }
+    if let Some(cache) = &cfg.cache_type {
+        flags.extend(["-ctk".into(), cache.clone(), "-ctv".into(), cache.clone()]);
+    }
+    if cfg.mtp {
+        flags.extend([
+            "--spec-type".into(),
+            "draft-mtp".into(),
+            "--spec-draft-n-max".into(),
+            "2".into(),
+        ]);
+    }
+    flags
 }
 
 pub fn wait_ready(
@@ -292,5 +307,26 @@ mod tests {
     fn formats_wait() {
         assert_eq!(format_elapsed(Duration::from_secs(9)), "9s");
         assert_eq!(format_elapsed(Duration::from_secs(75)), "1m 15s");
+    }
+
+    #[test]
+    fn gpu_flags_include_jinja_flash_and_mtp() {
+        let cfg = crate::runtime::config::LaunchConfig {
+            context: 4096,
+            batch: 512,
+            gpu_layers: "99".into(),
+            threads: 8,
+            port: 18790,
+            flash: true,
+            cache_type: Some("q8_0".into()),
+            mtp: true,
+        };
+        let flags = extra_flags(&cfg);
+        assert!(flags.iter().any(|flag| flag == "--jinja"));
+        assert!(flags.windows(2).any(|pair| pair[0] == "-fa" && pair[1] == "on"));
+        assert!(flags
+            .windows(2)
+            .any(|pair| pair[0] == "--spec-type" && pair[1] == "draft-mtp"));
+        assert!(flags.windows(2).any(|pair| pair[0] == "-ctk" && pair[1] == "q8_0"));
     }
 }

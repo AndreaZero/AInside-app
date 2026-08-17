@@ -13,7 +13,7 @@ pub use types::{ChatTurn, RuntimeSnapshot, TokenChunk};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -23,7 +23,10 @@ use crate::hardware;
 use crate::library;
 use crate::settings;
 
-use config::{apply_expert, device_label, plan_with_reclaim, LaunchPlan, INTERNAL_PORT};
+use config::{
+    apply_expert, device_label, model_has_mtp, next_relaxed, plan_with_reclaim, LaunchPlan,
+    INTERNAL_PORT,
+};
 use engine::EngineKind;
 use process::{
     display_log, format_elapsed, needs_newer_engine, port_in_use, wait_ready, ServerProcess,
@@ -447,15 +450,23 @@ fn load_inner(
     let kind = engine::choose_kind(&hardware);
     let profile = settings::profile(app)?;
     let weights = fs::metadata(&target.path).map(|m| m.len()).unwrap_or(0);
-    let planned = apply_expert(
+    let mut planned = apply_expert(
         plan_with_reclaim(&hardware, kind, profile, weights, reclaim)?,
         &settings::expert(app).unwrap_or_default(),
     );
+    if kind != EngineKind::Cpu
+        && planned.config.gpu_layers != "0"
+        && model_has_mtp(&target.model_id, &target.model_name, &target.path)
+    {
+        planned.config.mtp = true;
+        planned.detail = format!("{} mtp=1", planned.detail);
+    }
 
     let app_data = app
         .path()
         .app_data_dir()
         .map_err(|e| format!("Non trovo la cartella dati: {e}"))?;
+    write_plan(&app_data, &planned.detail);
 
     let mut force = false;
     let mut last_err = String::new();
@@ -512,51 +523,65 @@ fn launch_server(
                 format!("Carico {} in memoria · 0s", target.model_name),
             ),
         );
-        match ServerProcess::spawn(&engine.exe, &target.path, &cfg) {
-            Ok(mut server) => {
-                match wait_ready(&mut server, cancel, |elapsed, log| {
-                    let shown = display_log(log);
-                    write_load_log(app_data, &shown);
-                    manager.publish(
-                        app,
-                        base_snapshot(target, engine.kind, true, planned)
-                            .with_phase(
-                                RuntimePhase::Avvio,
-                                format!(
-                                    "Carico {} in memoria · {}",
-                                    target.model_name,
-                                    format_elapsed(elapsed)
-                                ),
-                            )
-                            .with_log(shown),
-                    );
-                }) {
-                    Ok(()) => {
-                        let snapshot = base_snapshot(target, engine.kind, true, planned)
-                            .with_phase(RuntimePhase::Pronto, planned.outcome.clone());
-                        write_load_log(
-                            app_data,
-                            &format!("Pronto.\n{}", display_log(&server.last_error())),
+        loop {
+            match ServerProcess::spawn(&engine.exe, &target.path, &cfg) {
+                Ok(mut server) => {
+                    match wait_ready(&mut server, cancel, |elapsed, log| {
+                        write_load_log(app_data, log);
+                        manager.publish(
+                            app,
+                            base_snapshot(target, engine.kind, true, planned)
+                                .with_phase(
+                                    RuntimePhase::Avvio,
+                                    format!(
+                                        "Carico {} in memoria · {}",
+                                        target.model_name,
+                                        format_elapsed(elapsed)
+                                    ),
+                                )
+                                .with_log(display_log(log)),
                         );
-                        let mut inner = manager.inner.lock().expect("runtime lock");
-                        inner.server = Some(server);
-                        inner.context_tokens = planned.config.context;
-                        inner.reserved_ram = planned.ram_bytes;
-                        return Ok(snapshot);
-                    }
-                    Err(err) => {
-                        write_load_log(app_data, &display_log(&server.last_error()));
-                        last_err = format!("{err} · {}", planned.detail);
-                        drop(server);
-                        if !port_in_use(&last_err) {
+                    }) {
+                        Ok(()) => {
+                            let snapshot = base_snapshot(target, engine.kind, true, planned)
+                                .with_phase(RuntimePhase::Pronto, planned.outcome.clone());
+                            write_load_log(
+                                app_data,
+                                &format!("Pronto.\n{}", server.last_error()),
+                            );
+                            let mut inner = manager.inner.lock().expect("runtime lock");
+                            inner.server = Some(server);
+                            inner.context_tokens = planned.config.context;
+                            inner.reserved_ram = planned.ram_bytes;
+                            return Ok(snapshot);
+                        }
+                        Err(err) => {
+                            write_load_log(app_data, &server.last_error());
+                            last_err = format!("{err} · {}", planned.detail);
+                            let died = !server.alive();
+                            drop(server);
+                            if port_in_use(&last_err) {
+                                break;
+                            }
+                            if died {
+                                if let Some(next) = next_relaxed(&cfg) {
+                                    cfg = next;
+                                    continue;
+                                }
+                            }
                             return Err(last_err);
                         }
                     }
                 }
-            }
-            Err(err) => {
-                last_err = format!("{err} · {}", planned.detail);
-                if !port_in_use(&last_err) {
+                Err(err) => {
+                    last_err = format!("{err} · {}", planned.detail);
+                    if port_in_use(&last_err) {
+                        break;
+                    }
+                    if let Some(next) = next_relaxed(&cfg) {
+                        cfg = next;
+                        continue;
+                    }
                     return Err(last_err);
                 }
             }
@@ -589,7 +614,7 @@ fn wait_ram_reclaim(reclaim: u64, cancel: &AtomicBool) {
 fn explain_load_err(err: String) -> String {
     if needs_newer_engine(&err) {
         format!(
-            "Questo modello è troppo nuovo per il motore locale. AInside prova ad aggiornare llama.cpp da solo; se resta così, il log sotto dice quale architettura manca.\n\n{err}"
+            "Questo modello è troppo nuovo per il motore locale. AInside prova ad aggiornare llama.cpp da solo; se resta così, apri Diagnostica per il log del motore.\n\n{err}"
         )
     } else {
         err
@@ -599,7 +624,99 @@ fn explain_load_err(err: String) -> String {
 fn write_load_log(app_data: &Path, text: &str) {
     let dir = app_data.join("runtime");
     let _ = fs::create_dir_all(&dir);
-    let _ = fs::write(dir.join("last-load.log"), text);
+    const MAX: usize = 256 * 1024;
+    let body = if text.len() > MAX {
+        let mut idx = text.len() - MAX;
+        while idx < text.len() && !text.is_char_boundary(idx) {
+            idx += 1;
+        }
+        format!("…\n{}", &text[idx..])
+    } else {
+        text.to_string()
+    };
+    let _ = fs::write(dir.join("last-load.log"), body);
+}
+
+fn write_plan(app_data: &Path, detail: &str) {
+    let dir = app_data.join("runtime");
+    let _ = fs::create_dir_all(&dir);
+    let _ = fs::write(dir.join("last-plan.txt"), detail);
+}
+
+fn read_runtime_file(app_data: &Path, name: &str) -> String {
+    fs::read_to_string(app_data.join("runtime").join(name)).unwrap_or_default()
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DebugReport {
+    pub app_name: String,
+    pub app_version: String,
+    pub engine_kind: String,
+    pub engine_tag: Option<String>,
+    pub plan_detail: String,
+    pub load_log: String,
+    pub runtime: Snapshot,
+    pub hardware: crate::hardware::HardwareReport,
+    pub profile: String,
+    pub thinking: bool,
+    pub expert: bool,
+    pub download_root: String,
+    pub runtime_dir: String,
+}
+
+#[tauri::command]
+pub fn get_debug_report(
+    app: AppHandle,
+    manager: State<RuntimeManager>,
+) -> Result<DebugReport, String> {
+    let hardware = debug_hardware();
+    let app_data = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Non trovo la cartella dati: {e}"))?;
+    let (kind, tag) = engine::installed_meta(&app_data, &hardware);
+    let settings = settings::current(&app)?;
+    let runtime = manager.snapshot();
+    let live = runtime.log.clone().unwrap_or_default();
+    let file_log = read_runtime_file(&app_data, "last-load.log");
+    let mut load_log = if file_log.len() >= live.len() {
+        file_log
+    } else {
+        live
+    };
+    if let Some(detail) = runtime.error_detail.as_deref() {
+        let detail = detail.trim();
+        if !detail.is_empty() && !load_log.contains(detail) {
+            if !load_log.trim().is_empty() {
+                load_log.push_str("\n\n");
+            }
+            load_log.push_str(detail);
+        }
+    }
+    Ok(DebugReport {
+        app_name: "AInside".into(),
+        app_version: env!("CARGO_PKG_VERSION").into(),
+        engine_kind: match kind {
+            EngineKind::Vulkan => "Vulkan".into(),
+            EngineKind::Cpu => "CPU".into(),
+        },
+        engine_tag: tag,
+        plan_detail: read_runtime_file(&app_data, "last-plan.txt"),
+        load_log,
+        runtime,
+        hardware,
+        profile: settings.profile.label_it().to_string(),
+        thinking: settings.thinking,
+        expert: settings.expert.enabled,
+        download_root: settings.library.download_root,
+        runtime_dir: app_data.join("runtime").to_string_lossy().into_owned(),
+    })
+}
+
+fn debug_hardware() -> crate::hardware::HardwareReport {
+    static CACHE: OnceLock<crate::hardware::HardwareReport> = OnceLock::new();
+    CACHE.get_or_init(hardware::get_hardware).clone()
 }
 
 fn base_snapshot(
