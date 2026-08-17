@@ -335,8 +335,8 @@ pub fn start_coding_turn(
         let expert = settings::expert(&app2).unwrap_or_default();
         let thinking = settings::thinking_enabled(&app2);
         let mut sample = stream::SampleConfig::from_expert(&expert, thinking, model_name.as_deref());
-        coding::apply_coding_prompt(&mut sample, model_name.as_deref());
         let context_tokens = if context_tokens == 0 { 4096 } else { context_tokens };
+        coding::apply_coding_prompt(&mut sample, model_name.as_deref(), context_tokens);
         let result = coding::run(
             port,
             &request,

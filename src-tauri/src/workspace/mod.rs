@@ -7,7 +7,8 @@ mod paths;
 pub(crate) mod write;
 
 pub use pack::{
-    build_pack, coding_system, leggi_paths, mentions_in, strip_leggi_lines, with_pack,
+    build_pack, clip_utf8, coding_system, fit_file_block, leggi_paths, mentions_in, strip_leggi_lines,
+    with_pack,
 };
 pub use write::WorkspaceHub;
 

@@ -63,58 +63,137 @@ pub fn strip_leggi_lines(text: &str) -> String {
         .to_string()
 }
 
+pub fn clip_utf8(text: &str, max: usize) -> String {
+    if max == 0 {
+        return String::new();
+    }
+    if text.len() <= max {
+        return text.to_string();
+    }
+    let ell = '…'.len_utf8();
+    if max <= ell {
+        return "…".into();
+    }
+    let mut end = max.saturating_sub(ell).min(text.len());
+    while end > 0 && !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    if end == 0 {
+        return "…".into();
+    }
+    let mut out = text[..end].trim_end().to_string();
+    out.push('…');
+    out
+}
+
+fn file_block(rel: &str, text: &str, truncated: bool) -> String {
+    let mut block = format!("### {rel}\n```\n{text}\n```\n");
+    if truncated {
+        block.push_str("(inizio del file)\n");
+    }
+    block
+}
+
 pub fn build_pack(root: &str, cited: &[String], budget_chars: usize) -> String {
+    if budget_chars < 24 {
+        return String::new();
+    }
     let mut parts = Vec::new();
+    let tree_budget = (budget_chars / 3).min(budget_chars.saturating_sub(24));
     if let Ok(tree) = workspace_tree(root.to_string()) {
         let mut files = Vec::new();
         flatten_files(&tree.nodes, &mut files);
-        if !files.is_empty() {
-            let max = 180.min(files.len());
-            let mut list = String::from("File nel progetto:\n");
-            for rel in files.iter().take(max) {
-                list.push_str("- ");
-                list.push_str(rel);
-                list.push('\n');
-            }
-            if files.len() > max || tree.truncated {
-                list.push_str("- …\n");
-            }
+        if let Some(list) = tree_list(&files, tree.truncated, tree_budget) {
             parts.push(list);
         }
     }
 
-    let mut used: Vec<String> = Vec::new();
+    let header = "Contenuto dei file citati:\n";
+    let mut used: usize = parts.iter().map(String::len).sum();
     let mut packed = String::new();
+    let mut seen: Vec<String> = Vec::new();
     for rel in cited {
         let rel = normalize_cite(rel);
-        if rel.is_empty() || used.iter().any(|old| old == &rel) {
+        if rel.is_empty() || seen.iter().any(|old| old == &rel) {
             continue;
+        }
+        let room = budget_chars
+            .saturating_sub(used)
+            .saturating_sub(header.len())
+            .saturating_sub(packed.len());
+        if room < 40 {
+            break;
         }
         match read_rel(root, &rel) {
             Ok(file) => {
-                let mut block = format!("### {}\n```\n{}\n```\n", file.rel, file.text);
-                if file.truncated {
-                    block.push_str("(inizio del file)\n");
-                }
-                if packed.len() + block.len() + parts.iter().map(String::len).sum::<usize>()
-                    > budget_chars
-                    && !packed.is_empty()
-                {
+                let (block, ok) = fit_file_block(&file.rel, &file.text, file.truncated, room);
+                if !ok {
                     break;
                 }
                 packed.push_str(&block);
-                used.push(rel);
+                seen.push(rel);
             }
             Err(err) => {
-                packed.push_str(&format!("### {rel}\n({err})\n"));
-                used.push(rel);
+                let line = format!("### {rel}\n({err})\n");
+                if line.len() > room && !packed.is_empty() {
+                    break;
+                }
+                packed.push_str(&clip_utf8(&line, room));
+                seen.push(rel);
             }
         }
     }
     if !packed.is_empty() {
-        parts.push(format!("Contenuto dei file citati:\n{packed}"));
+        parts.push(format!("{header}{packed}"));
     }
-    parts.join("\n")
+    let out = parts.join("\n");
+    if out.len() > budget_chars {
+        clip_utf8(&out, budget_chars)
+    } else {
+        out
+    }
+}
+
+fn tree_list(files: &[String], truncated: bool, budget: usize) -> Option<String> {
+    if files.is_empty() || budget < 20 {
+        return None;
+    }
+    let mut list = String::from("File nel progetto:\n");
+    let mut n = 0usize;
+    let more = "- …\n";
+    for rel in files {
+        let line = format!("- {rel}\n");
+        let need_more = n + 1 < files.len() || truncated;
+        let extra = if need_more { more.len() } else { 0 };
+        if list.len() + line.len() + extra > budget {
+            break;
+        }
+        list.push_str(&line);
+        n += 1;
+        if n >= 80 {
+            break;
+        }
+    }
+    if n == 0 {
+        return None;
+    }
+    if (n < files.len() || truncated) && list.len() + more.len() <= budget {
+        list.push_str(more);
+    }
+    Some(list)
+}
+
+pub fn fit_file_block(rel: &str, text: &str, truncated: bool, room: usize) -> (String, bool) {
+    let full = file_block(rel, text, truncated);
+    if full.len() <= room {
+        return (full, true);
+    }
+    let wrap = file_block(rel, "", true).len() + 8;
+    let keep = room.saturating_sub(wrap);
+    if keep < 24 {
+        return (String::new(), false);
+    }
+    (file_block(rel, &clip_utf8(text, keep), true), true)
 }
 
 pub fn with_pack(last_user: &str, pack: &str) -> String {
@@ -174,5 +253,31 @@ mod tests {
     #[test]
     fn skips_email_like_mentions() {
         assert!(mentions_in("scrivi a foo@bar.com").is_empty());
+    }
+
+    #[test]
+    fn clip_utf8_does_not_split_ellipsis() {
+        let text = "Ho letto il file… ecco.";
+        let out = clip_utf8(text, 20);
+        assert!(out.is_char_boundary(out.len()));
+        assert!(!out.contains('\u{FFFD}'));
+    }
+
+    #[test]
+    fn tree_list_stays_in_budget() {
+        let files: Vec<String> = (0..200).map(|i| format!("src/file-{i}.ts")).collect();
+        let list = tree_list(&files, false, 120).unwrap();
+        assert!(list.len() <= 120);
+        assert!(list.contains('…'));
+    }
+
+    #[test]
+    fn file_block_truncates_to_room() {
+        let body = "a".repeat(4000);
+        let (block, ok) = fit_file_block("src/app.ts", &body, false, 200);
+        assert!(ok);
+        assert!(block.len() <= 200);
+        assert!(block.contains("src/app.ts"));
+        assert!(block.contains("(inizio del file)"));
     }
 }

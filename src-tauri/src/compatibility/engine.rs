@@ -244,8 +244,10 @@ fn quant_tier(quant: &str) -> i32 {
         2
     } else if q.contains("Q3") || q.contains("IQ3") {
         1
-    } else {
+    } else if q.contains("Q2_K") {
         0
+    } else {
+        -1
     }
 }
 
@@ -423,6 +425,25 @@ mod tests {
         )]);
         let set = recommend(&cat, &hardware(Some(24.0), 32.0, 400.0));
         assert_eq!(set.picks[0].recommended.quant, "Q5_K_M");
+    }
+
+    #[test]
+    fn busy_32gb_picks_unsloth_light_not_q4() {
+        let cat = catalog(vec![model(
+            "qwen38-27b",
+            5,
+            vec![
+                variant("iq2", "UD-IQ2_XXS", 8.4),
+                variant("q2", "UD-Q2_K_XL", 9.9),
+                variant("q3", "UD-Q3_K_XL", 12.5),
+                variant("q4", "Q4_K_S", 15.0),
+            ],
+        )]);
+        let mut machine = hardware(Some(12.0), 32.0, 200.0);
+        machine.memory.available_bytes = Some(7 * GIB + 100 * MIB);
+        let set = recommend(&cat, &machine);
+        assert_eq!(set.picks.len(), 1);
+        assert_eq!(set.picks[0].recommended.quant, "UD-Q2_K_XL");
     }
 
     #[test]

@@ -23,9 +23,31 @@ type FenceChunk =
   | { kind: "text"; text: string }
   | { kind: "code"; lang: string | null; text: string };
 
+const FENCE_CLOSED = /```[ \t]*([a-zA-Z0-9_+-]*)[ \t]*\n?([\s\S]*?)```/g;
+
+function fenceLang(raw: string): string | null {
+  const lang = raw.trim().toLowerCase();
+  return lang || null;
+}
+
+function findFenceOpen(src: string): { index: number; lang: string | null; bodyAt: number } | null {
+  const re = /```[ \t]*([a-zA-Z0-9_+-]*)[ \t]*\n?/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(src))) {
+    if (match.index === 0 || src[match.index - 1] === "\n") {
+      return {
+        index: match.index,
+        lang: fenceLang(match[1] ?? ""),
+        bodyAt: match.index + match[0].length,
+      };
+    }
+  }
+  return null;
+}
+
 function splitFences(src: string): FenceChunk[] {
   const chunks: FenceChunk[] = [];
-  const fence = /```([a-zA-Z0-9_+-]*)[ \t]*\n?([\s\S]*?)```/g;
+  const fence = new RegExp(FENCE_CLOSED.source, "g");
   let last = 0;
   let match: RegExpExecArray | null;
 
@@ -35,21 +57,36 @@ function splitFences(src: string): FenceChunk[] {
     }
     chunks.push({
       kind: "code",
-      lang: match[1] || null,
+      lang: fenceLang(match[1] ?? ""),
       text: match[2].replace(/\n$/, ""),
     });
     last = match.index + match[0].length;
   }
 
   const rest = src.slice(last);
-  const open = /^```([a-zA-Z0-9_+-]*)[ \t]*\n?([\s\S]*)$/.exec(rest);
-  if (open) {
-    chunks.push({ kind: "code", lang: open[1] || null, text: open[2] });
-  } else if (rest) {
-    chunks.push({ kind: "text", text: rest });
+  if (rest) {
+    const open = findFenceOpen(rest);
+    if (open) {
+      if (open.index > 0) {
+        chunks.push({ kind: "text", text: rest.slice(0, open.index) });
+      }
+      chunks.push({
+        kind: "code",
+        lang: open.lang,
+        text: rest.slice(open.bodyAt),
+      });
+    } else {
+      chunks.push({ kind: "text", text: rest });
+    }
   }
 
   return chunks.length > 0 ? chunks : [{ kind: "text", text: src }];
+}
+
+export function extractCodeFences(src: string): { lang: string | null; text: string }[] {
+  return splitFences(src)
+    .filter((chunk): chunk is Extract<FenceChunk, { kind: "code" }> => chunk.kind === "code")
+    .map((chunk) => ({ lang: chunk.lang, text: chunk.text }));
 }
 
 export function parseInline(input: string): MdInline[] {

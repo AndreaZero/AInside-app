@@ -4,20 +4,24 @@ import { useChats } from "../hooks/useChats";
 import { useLibrary, useLibrarySnapshot } from "../hooks/useLibrary";
 import { useRuntime } from "../hooks/useRuntime";
 import { useSettings } from "../hooks/useSettings";
+import { useStickToBottom } from "../hooks/useStickToBottom";
 import { useTokenRate } from "../hooks/useTokenRate";
 import { sessionKind, type ChatMessage } from "../lib/chat";
-import { cx } from "../lib/cx";
 import { formatDuration, formatProgress, formatTokenRate } from "../lib/format";
 import { canChat, composerPlaceholder } from "../lib/runtime";
+import { visibleAnswer } from "../lib/think";
+import { webPreviewDoc } from "../lib/webPreview";
 import type { RouteId } from "../navigation/routes";
 import { Button, StatusBadge } from "../ui/controls";
-import { IconEye, IconMore, IconSend, IconSpark, IconStop } from "../ui/icons";
-import { MenuItem, Popover, Tooltip, useFeedback } from "../ui/overlays";
+import { IconSend, IconStop } from "../ui/icons";
+import { MenuItem, Popover, useFeedback } from "../ui/overlays";
 import { RuntimeLoadLog } from "../layout/RuntimeBanner";
 import { EmptyState, ErrorState, InlineAlert } from "../ui/states";
 import { EmptyGlyph } from "../visuals/DownloadRig";
 import { ModelLogo } from "../visuals/ModelLogo";
 import { AssistantMessage, UserBubble } from "./chat/ChatMessage";
+import { ComposerThinkTools } from "./chat/ComposerThinkTools";
+import { PreviewHost, PreviewToggle } from "./chat/PreviewPane";
 
 type ChatViewProps = {
   onNavigate: (route: RouteId) => void;
@@ -45,7 +49,6 @@ export function ChatView({ onNavigate }: ChatViewProps) {
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState<ChatMessage[]>([]);
   const [copied, setCopied] = useState<number | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const pendingReply = useRef(false);
   const genStarted = useRef<number | null>(null);
@@ -62,6 +65,9 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     [active?.modelId, active?.modelName, active?.variantId],
   );
   const tokenRate = useTokenRate(runtime.reply, snapshot?.phase === "inRisposta");
+  const log = useStickToBottom(
+    `${currentId}:${turns.length}:${runtime.reply.length}:${snapshot?.phase ?? ""}`,
+  );
 
   useEffect(() => {
     if (pendingReply.current) return;
@@ -114,6 +120,8 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     const text = input.trim();
     if (!text || !canChat(snapshot)) return;
     setInput("");
+    if (area.current) area.current.style.height = "32px";
+    log.pin();
     genStarted.current = Date.now();
     setElapsedMs(0);
     const next: ChatMessage[] = [...turns, { role: "user", content: text }];
@@ -129,6 +137,7 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     const last = turns[turns.length - 1];
     if (last?.role !== "assistant") return;
     const next = turns.slice(0, -1);
+    log.pin();
     genStarted.current = Date.now();
     setElapsedMs(0);
     pendingReply.current = true;
@@ -165,7 +174,7 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     const el = area.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }
 
   if (!active && turns.length === 0 && !session) {
@@ -188,6 +197,19 @@ export function ChatView({ onNavigate }: ChatViewProps) {
   const title = session?.title ?? snapshot?.modelName ?? active?.modelName ?? "Chat";
   const downloading = snapshot?.phase === "motore" && snapshot.expectedBytes > 0;
   const lastAssistant = turns.length > 0 && turns[turns.length - 1]?.role === "assistant";
+  let lastAssistantText = "";
+  for (let i = turns.length - 1; i >= 0; i -= 1) {
+    if (turns[i].role === "assistant") {
+      lastAssistantText = turns[i].content;
+      break;
+    }
+  }
+  const streamingDoc = runtime.reply ? webPreviewDoc(visibleAnswer(runtime.reply)) : null;
+  const storedDoc = lastAssistantText
+    ? webPreviewDoc(visibleAnswer(lastAssistantText))
+    : null;
+  const previewDoc = streamingDoc ?? storedDoc;
+  const previewLive = Boolean(streamingDoc && snapshot?.phase === "inRisposta");
   const readyModels = library.items.filter((item) => item.status === "pronto");
   const localeKind =
     snapshot?.phase === "inRisposta" || snapshot?.phase === "pronto"
@@ -201,6 +223,7 @@ export function ChatView({ onNavigate }: ChatViewProps) {
   return (
     <section className="page page--fill">
       <div className="chat-shell">
+        <PreviewHost doc={previewDoc} live={previewLive} resetKey={currentId}>
         <div className="chat-main">
           <header className="chat-head">
             <div className="chat-head-meta">
@@ -220,22 +243,44 @@ export function ChatView({ onNavigate }: ChatViewProps) {
                 open={modelOpen}
                 onClose={() => setModelOpen(false)}
                 content={
-                  readyModels.length === 0 ? (
-                    <MenuItem onSelect={() => onNavigate("models")}>Scegli un modello</MenuItem>
-                  ) : (
-                    readyModels.map((item) => (
+                  <>
+                    {readyModels.length === 0 ? (
+                      <MenuItem onSelect={() => onNavigate("models")}>Scegli un modello</MenuItem>
+                    ) : (
+                      readyModels.map((item) => (
+                        <MenuItem
+                          key={item.variantId}
+                          onSelect={() => {
+                            setModelOpen(false);
+                            void libraryApi.useModel(item.modelId, item.variantId);
+                          }}
+                        >
+                          {item.modelName}
+                          {item.active ? " · in uso" : ""}
+                        </MenuItem>
+                      ))
+                    )}
+                    {currentId ? (
                       <MenuItem
-                        key={item.variantId}
+                        danger
                         onSelect={() => {
                           setModelOpen(false);
-                          void libraryApi.useModel(item.modelId, item.variantId);
+                          void feedback
+                            .confirm({
+                              title: "Togliere questa conversazione?",
+                              description: "La chat sparisce da AInside. I file dei modelli restano.",
+                              confirmLabel: "Togli",
+                              danger: true,
+                            })
+                            .then((ok) => {
+                              if (ok) void chats.remove(currentId);
+                            });
                         }}
                       >
-                        {item.modelName}
-                        {item.active ? " · in uso" : ""}
+                        Togli questa chat
                       </MenuItem>
-                    ))
-                  )
+                    ) : null}
+                  </>
                 }
               >
                 <Button variant="ghost" onClick={() => setModelOpen((v) => !v)}>
@@ -247,88 +292,8 @@ export function ChatView({ onNavigate }: ChatViewProps) {
                   ? "Locale"
                   : snapshot?.phaseLabel ?? "Locale"}
               </StatusBadge>
-              <div className="chat-think-tools">
-                <Tooltip label={thinkingOn ? "Spegni ragionamento" : "Accendi ragionamento"}>
-                  <Button
-                    variant="icon"
-                    className={cx(thinkingOn && "is-on")}
-                    aria-pressed={thinkingOn}
-                    aria-label={thinkingOn ? "Spegni ragionamento" : "Accendi ragionamento"}
-                    onClick={() => void changeThinking(!thinkingOn)}
-                  >
-                    <IconSpark size={15} />
-                  </Button>
-                </Tooltip>
-                <Tooltip label={showThinking ? "Nascondi ragionamento" : "Mostra ragionamento"}>
-                  <Button
-                    variant="icon"
-                    className={cx(showThinking && "is-on")}
-                    aria-pressed={showThinking}
-                    aria-label={showThinking ? "Nascondi ragionamento" : "Mostra ragionamento"}
-                    onClick={toggleShowThinking}
-                  >
-                    <IconEye size={15} />
-                  </Button>
-                </Tooltip>
-              </div>
             </div>
-            <Popover
-              open={menuOpen}
-              onClose={() => setMenuOpen(false)}
-              align="end"
-              content={
-                <>
-                  <MenuItem
-                    onSelect={() => {
-                      setMenuOpen(false);
-                      onNavigate("models");
-                    }}
-                  >
-                    Cambia modello
-                  </MenuItem>
-                  <MenuItem
-                    onSelect={() => {
-                      setMenuOpen(false);
-                      void changeThinking(!thinkingOn);
-                    }}
-                  >
-                    {thinkingOn ? "Spegni ragionamento" : "Accendi ragionamento"}
-                  </MenuItem>
-                  <MenuItem
-                    onSelect={() => {
-                      setMenuOpen(false);
-                      toggleShowThinking();
-                    }}
-                  >
-                    {showThinking ? "Nascondi ragionamento" : "Mostra ragionamento"}
-                  </MenuItem>
-                  {currentId && (
-                    <MenuItem
-                      danger
-                      onSelect={() => {
-                        setMenuOpen(false);
-                        void feedback
-                          .confirm({
-                            title: "Togliere questa conversazione?",
-                            description: "La chat sparisce da AInside. I file dei modelli restano.",
-                            confirmLabel: "Togli",
-                            danger: true,
-                          })
-                          .then((ok) => {
-                            if (ok) void chats.remove(currentId);
-                          });
-                      }}
-                    >
-                      Togli questa chat
-                    </MenuItem>
-                  )}
-                </>
-              }
-            >
-              <Button variant="icon" aria-label="Menu chat" onClick={() => setMenuOpen((v) => !v)}>
-                <IconMore />
-              </Button>
-            </Popover>
+            <PreviewToggle />
           </header>
 
           {(runtime.error || snapshot?.phase === "errore") && (
@@ -353,7 +318,7 @@ export function ChatView({ onNavigate }: ChatViewProps) {
             </div>
           )}
 
-          <div className="chat-log" aria-live="polite">
+          <div className="chat-log" aria-live="polite" ref={log.ref} onScroll={log.onScroll}>
             {turns.length === 0 && !runtime.reply && snapshot?.phase !== "inRisposta" && (
               <p className="page-note">
                 {snapshot?.phase === "motore" || snapshot?.phase === "avvio"
@@ -427,37 +392,46 @@ export function ChatView({ onNavigate }: ChatViewProps) {
                 void onSend();
               }}
             >
-              <textarea
-                ref={area}
-                rows={1}
-                value={input}
-                disabled={!canChat(snapshot)}
-                placeholder={composerPlaceholder(snapshot, Boolean(active), "Scrivi qui.")}
-                onChange={(event) => {
-                  setInput(event.target.value);
-                  resize();
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    void onSend();
-                  }
-                }}
+              <div className="chat-composer-field">
+                <textarea
+                  ref={area}
+                  rows={1}
+                  value={input}
+                  disabled={!canChat(snapshot)}
+                  placeholder={composerPlaceholder(snapshot, Boolean(active), "Scrivi qui.")}
+                  onChange={(event) => {
+                    setInput(event.target.value);
+                    resize();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void onSend();
+                    }
+                  }}
+                />
+                {snapshot?.phase === "inRisposta" ? (
+                  <Button variant="primary" onClick={() => void runtime.stop()}>
+                    <IconStop size={14} />
+                    Stop
+                  </Button>
+                ) : (
+                  <Button variant="primary" type="submit" disabled={!canChat(snapshot) || !input.trim()}>
+                    <IconSend size={14} />
+                    Invia
+                  </Button>
+                )}
+              </div>
+              <ComposerThinkTools
+                thinkingOn={thinkingOn}
+                showThinking={showThinking}
+                onToggleThinking={() => void changeThinking(!thinkingOn)}
+                onToggleShow={toggleShowThinking}
               />
-              {snapshot?.phase === "inRisposta" ? (
-                <Button variant="primary" onClick={() => void runtime.stop()}>
-                  <IconStop size={14} />
-                  Stop
-                </Button>
-              ) : (
-                <Button variant="primary" type="submit" disabled={!canChat(snapshot) || !input.trim()}>
-                  <IconSend size={14} />
-                  Invia
-                </Button>
-              )}
             </form>
           </div>
         </div>
+        </PreviewHost>
       </div>
     </section>
   );

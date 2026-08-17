@@ -147,9 +147,8 @@ pub fn complete(
         .map_err(|e| format!("Il modello non risponde: {e}"))?;
 
     if !response.status().is_success() {
-        let status = response.status();
         let text = response.text().unwrap_or_default();
-        return Err(format!("Risposta rifiutata ({status}): {text}"));
+        return Err(explain_reject(&text));
     }
 
     let mut reader = BufReader::new(&mut response);
@@ -426,11 +425,26 @@ fn as_text(value: Option<&Value>) -> Option<String> {
 fn take_error(line: &str) -> Option<String> {
     let data = line.trim().strip_prefix("data:")?.trim();
     let value: Value = serde_json::from_str(data).ok()?;
-    value
+    let raw = value
         .get("error")
         .and_then(|error| error.get("message"))
-        .and_then(Value::as_str)
-        .map(str::to_string)
+        .and_then(Value::as_str)?;
+    Some(explain_reject(raw))
+}
+
+fn explain_reject(raw: &str) -> String {
+    let lower = raw.to_ascii_lowercase();
+    if lower.contains("exceed_context") || lower.contains("exceeds the available context") {
+        return "Troppi file insieme: la memoria di lavoro del modello è piena. Chiedi un pezzo alla volta.".into();
+    }
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        "Il modello ha rifiutato la richiesta.".into()
+    } else if trimmed.starts_with('{') {
+        format!("Il modello ha rifiutato la richiesta: {trimmed}")
+    } else {
+        trimmed.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -514,5 +528,13 @@ mod tests {
             guess_answer_from_think(buf).as_deref(),
             Some("Ciao! Sono AInside. Che cosa ti serve oggi?")
         );
+    }
+
+    #[test]
+    fn context_overflow_is_italian() {
+        let raw = r#"{"error":{"code":400,"message":"request (2140 tokens) exceeds the available context size (1024 tokens), try increasing it","type":"exceed_context_size_error"}}"#;
+        let msg = explain_reject(raw);
+        assert!(msg.contains("memoria di lavoro"));
+        assert!(!msg.contains("2140"));
     }
 }

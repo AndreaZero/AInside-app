@@ -1,22 +1,22 @@
 {
-  "version": 5,
-  "updatedAt": "2026-08-16",
-  "sourceNote": "Catalogo unico, verificato il 16 agosto 2026 su Hugging Face. Download e preferiti dal repo GGUF; i bench, se ci sono, dalla scheda ufficiale. L’app non è tarata su un computer: dopo l’analisi mostra quelli che stanno sul PC di chi la apre.",
+  "version": 6,
+  "updatedAt": "2026-08-17",
+  "sourceNote": "Catalogo unico, verificato il 17 agosto 2026 su Hugging Face. Download e preferiti dal repo GGUF; i bench, se ci sono, dalla scheda ufficiale. L’app non è tarata su un computer: dopo l’analisi mostra quelli che stanno sul PC di chi la apre.",
   "models": [
     {
       "id": "qwen38-27b",
       "name": "Qwen 3.8",
-      "description": "Uscito il 14 agosto 2026. Ventisette miliardi densi, visione inclusa. Il riferimento aperto di questa settimana, se il computer ha spazio.",
+      "description": "Uscito il 14 agosto 2026. Ventisette miliardi densi, visione inclusa. Unsloth lo prepara anche in versioni più leggere, così entra su più computer.",
       "categories": ["generale", "scrittura", "visione"],
       "quality": { "overall": 5, "italian": 4, "coding": 5, "reasoning": 5 },
       "author": "Qwen / Unsloth",
       "logoOrg": "Qwen",
       "license": "Apache 2.0",
       "stats": {
-        "downloads": 1945635,
-        "likes": 1426,
+        "downloads": 2727609,
+        "likes": 1528,
         "repo": "unsloth/Qwen3.8-27B-GGUF",
-        "checkedAt": "2026-08-16",
+        "checkedAt": "2026-08-17",
         "benches": [
           { "label": "Codice", "value": "61,7", "source": "SWE-bench Pro" },
           { "label": "Scienza", "value": "89,2", "source": "GPQA Diamond" },
@@ -24,6 +24,46 @@
         ]
       },
       "variants": [
+        {
+          "id": "qwen38-27b-ud-iq2xxs",
+          "quant": "UD-IQ2_XXS",
+          "filename": "Qwen3.8-27B-UD-IQ2_XXS.gguf",
+          "sizeBytes": 9010048064,
+          "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-IQ2_XXS.gguf",
+          "sha256": "8d1b37297d6cf98303cd396896f35e01089ddcc904053a9c6997f7a1c35b8524"
+        },
+        {
+          "id": "qwen38-27b-ud-q2kxl",
+          "quant": "UD-Q2_K_XL",
+          "filename": "Qwen3.8-27B-UD-Q2_K_XL.gguf",
+          "sizeBytes": 10676423744,
+          "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-Q2_K_XL.gguf",
+          "sha256": "46151b52a5cad673d90a00222103254864326c251130b8fc4381d6f34386b3c8"
+        },
+        {
+          "id": "qwen38-27b-ud-iq3xxs",
+          "quant": "UD-IQ3_XXS",
+          "filename": "Qwen3.8-27B-UD-IQ3_XXS.gguf",
+          "sizeBytes": 11913559104,
+          "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-IQ3_XXS.gguf",
+          "sha256": "0a6129dcbbbe72f423dc67e0e3bbfbbdf3e923981a3637687ebb96a46c59d6be"
+        },
+        {
+          "id": "qwen38-27b-ud-q3kxl",
+          "quant": "UD-Q3_K_XL",
+          "filename": "Qwen3.8-27B-UD-Q3_K_XL.gguf",
+          "sizeBytes": 13441059904,
+          "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-UD-Q3_K_XL.gguf",
+          "sha256": "00cf92e666c6af6566996c38c89a44ccdb6449ea25ef0f112a452c853b2a71e2"
+        },
+        {
+          "id": "qwen38-27b-iq4xs",
+          "quant": "IQ4_XS",
+          "filename": "Qwen3.8-27B-IQ4_XS.gguf",
+          "sizeBytes": 15705861088,
+          "url": "https://huggingface.co/unsloth/Qwen3.8-27B-GGUF/resolve/main/Qwen3.8-27B-IQ4_XS.gguf",
+          "sha256": "9fd40d7036f5e0918e20aaeebf11468fafd06bb53d4d980eef6bb7e4e4ace666"
+        },
         {
           "id": "qwen38-27b-q4ks",
           "quant": "Q4_K_S",

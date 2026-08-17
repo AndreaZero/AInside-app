@@ -9,6 +9,7 @@ const GIB: u64 = 1024 * 1024 * 1024;
 const MIB: u64 = 1024 * 1024;
 pub const INTERNAL_PORT: u16 = 18790;
 const MIN_CONTEXT: u32 = 1024;
+const COMFORT_CONTEXT: u32 = 4096;
 
 #[derive(Debug, Clone)]
 pub struct LaunchConfig {
@@ -89,7 +90,7 @@ pub fn plan_with_reclaim(
             });
         }
 
-        if context > MIN_CONTEXT {
+        if context > COMFORT_CONTEXT {
             context = next_context(context);
             continue;
         }
@@ -99,6 +100,10 @@ pub fn plan_with_reclaim(
         }
         if ngl > 0 {
             ngl = next_ngl(ngl);
+            continue;
+        }
+        if context > MIN_CONTEXT {
+            context = next_context(context);
             continue;
         }
         break;
@@ -485,11 +490,12 @@ mod tests {
             EngineKind::Vulkan,
             PerfProfile::Bilanciato,
             16 * GIB,
-        );
+        )
+        .expect("32 GB, file 16 GB già in cache, 7 GB “liberi”: deve partire.");
         assert!(
-            plan.is_ok(),
-            "32 GB, file 16 GB già in cache, 7 GB “liberi”: deve partire. {:?}",
-            plan.err()
+            plan.config.context >= 4096,
+            "su questo PC il modello deve tenere memoria di lavoro da codice, non 1024: {}",
+            plan.config.context
         );
     }
 

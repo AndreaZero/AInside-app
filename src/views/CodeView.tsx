@@ -4,6 +4,7 @@ import { useChats } from "../hooks/useChats";
 import { useLibrary, useLibrarySnapshot } from "../hooks/useLibrary";
 import { useRuntime } from "../hooks/useRuntime";
 import { useSettings } from "../hooks/useSettings";
+import { useStickToBottom } from "../hooks/useStickToBottom";
 import { useTokenRate } from "../hooks/useTokenRate";
 import { folderName, sessionKind, type ChatMessage } from "../lib/chat";
 import { cx } from "../lib/cx";
@@ -11,6 +12,7 @@ import { formatDuration, formatTokenRate } from "../lib/format";
 import { pickFolder } from "../lib/pickFolder";
 import { canChat, composerPlaceholder } from "../lib/runtime";
 import { visibleAnswer, splitThink } from "../lib/think";
+import { webPreviewDoc } from "../lib/webPreview";
 import {
   flattenFiles,
   fileLabel,
@@ -31,19 +33,14 @@ import { codingGrant, codingRevoke, codingStatus } from "../lib/backend";
 import type { CodingStatus } from "../lib/settings";
 import type { RouteId } from "../navigation/routes";
 import { Button, StatusBadge } from "../ui/controls";
-import {
-  IconEye,
-  IconFolder,
-  IconMore,
-  IconSend,
-  IconSpark,
-  IconStop,
-} from "../ui/icons";
+import { IconFolder, IconSend, IconStop } from "../ui/icons";
 import { MenuItem, Popover, Tooltip, useFeedback } from "../ui/overlays";
 import { EmptyState, ErrorState, InlineAlert } from "../ui/states";
 import { RuntimeLoadLog } from "../layout/RuntimeBanner";
 import { ModelLogo } from "../visuals/ModelLogo";
 import { AssistantMessage, UserBubble } from "./chat/ChatMessage";
+import { ComposerThinkTools } from "./chat/ComposerThinkTools";
+import { PreviewHost, PreviewToggle } from "./chat/PreviewPane";
 import { CodeMentions } from "./code/CodeMentions";
 import { CodePatchCard } from "./code/CodePatchCard";
 import { CodePreview } from "./code/CodePreview";
@@ -77,7 +74,6 @@ export function CodeView({ onNavigate }: CodeViewProps) {
   const [input, setInput] = useState("");
   const [turns, setTurns] = useState<ChatMessage[]>([]);
   const [copied, setCopied] = useState<number | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
   const [permOpen, setPermOpen] = useState(false);
   const [writeStatus, setWriteStatus] = useState<CodingStatus | null>(null);
@@ -108,6 +104,9 @@ export function CodeView({ onNavigate }: CodeViewProps) {
     [active?.modelId, active?.modelName, active?.variantId],
   );
   const tokenRate = useTokenRate(runtime.reply, snapshot?.phase === "inRisposta");
+  const log = useStickToBottom(
+    `${currentId}:${turns.length}:${runtime.reply.length}:${snapshot?.phase ?? ""}`,
+  );
   const catalogModel =
     catalog.status === "ready" && active
       ? catalog.catalog.models.find((item) => item.id === active.modelId)
@@ -410,6 +409,8 @@ export function CodeView({ onNavigate }: CodeViewProps) {
     const text = input.trim();
     if (!text || !workspace || !canChat(snapshot)) return;
     setInput("");
+    if (area.current) area.current.style.height = "32px";
+    log.pin();
     genStarted.current = Date.now();
     setElapsedMs(0);
     const next: ChatMessage[] = [...turns, { role: "user", content: text }];
@@ -425,6 +426,7 @@ export function CodeView({ onNavigate }: CodeViewProps) {
     const last = turns[turns.length - 1];
     if (last?.role !== "assistant") return;
     const next = turns.slice(0, -1);
+    log.pin();
     genStarted.current = Date.now();
     setElapsedMs(0);
     pendingReply.current = true;
@@ -461,7 +463,7 @@ export function CodeView({ onNavigate }: CodeViewProps) {
     const el = area.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }
 
   function refreshMentions(text: string, caret: number) {
@@ -540,6 +542,21 @@ export function CodeView({ onNavigate }: CodeViewProps) {
   }
 
   const lastAssistant = turns.length > 0 && turns[turns.length - 1]?.role === "assistant";
+  let lastAssistantText = "";
+  for (let i = turns.length - 1; i >= 0; i -= 1) {
+    if (turns[i].role === "assistant") {
+      lastAssistantText = turns[i].content;
+      break;
+    }
+  }
+  const streamingDoc = runtime.reply
+    ? webPreviewDoc(visibleAnswer(stripEditBlocks(runtime.reply)))
+    : null;
+  const storedDoc = lastAssistantText
+    ? webPreviewDoc(visibleAnswer(stripEditBlocks(lastAssistantText)))
+    : null;
+  const previewDoc = streamingDoc ?? storedDoc;
+  const previewLive = Boolean(streamingDoc && snapshot?.phase === "inRisposta");
   const readyModels = library.items.filter((item) => item.status === "pronto");
   const localeKind =
     snapshot?.phase === "inRisposta" || snapshot?.phase === "pronto"
@@ -628,6 +645,7 @@ export function CodeView({ onNavigate }: CodeViewProps) {
           selected={preview?.rel ?? null}
           onSelect={(rel) => void openFile(rel)}
         />
+        <PreviewHost doc={previewDoc} live={previewLive} resetKey={session?.id}>
         <div className="chat-main">
           <header className="chat-head">
             <div className="chat-head-meta">
@@ -645,22 +663,45 @@ export function CodeView({ onNavigate }: CodeViewProps) {
                 open={modelOpen}
                 onClose={() => setModelOpen(false)}
                 content={
-                  readyModels.length === 0 ? (
-                    <MenuItem onSelect={() => onNavigate("models")}>Scegli un modello</MenuItem>
-                  ) : (
-                    readyModels.map((item) => (
+                  <>
+                    {readyModels.length === 0 ? (
+                      <MenuItem onSelect={() => onNavigate("models")}>Scegli un modello</MenuItem>
+                    ) : (
+                      readyModels.map((item) => (
+                        <MenuItem
+                          key={item.variantId}
+                          onSelect={() => {
+                            setModelOpen(false);
+                            void libraryApi.useModel(item.modelId, item.variantId);
+                          }}
+                        >
+                          {item.modelName}
+                          {item.active ? " · in uso" : ""}
+                        </MenuItem>
+                      ))
+                    )}
+                    {currentId ? (
                       <MenuItem
-                        key={item.variantId}
+                        danger
                         onSelect={() => {
                           setModelOpen(false);
-                          void libraryApi.useModel(item.modelId, item.variantId);
+                          void feedback
+                            .confirm({
+                              title: "Togliere questo lavoro?",
+                              description:
+                                "La conversazione sparisce da AInside. I file del progetto restano sul disco.",
+                              confirmLabel: "Togli",
+                              danger: true,
+                            })
+                            .then((ok) => {
+                              if (ok) void chats.remove(currentId);
+                            });
                         }}
                       >
-                        {item.modelName}
-                        {item.active ? " · in uso" : ""}
+                        Togli questo lavoro
                       </MenuItem>
-                    ))
-                  )
+                    ) : null}
+                  </>
                 }
               >
                 <Button variant="ghost" onClick={() => setModelOpen((v) => !v)}>
@@ -682,8 +723,14 @@ export function CodeView({ onNavigate }: CodeViewProps) {
                   ? "Locale"
                   : snapshot?.phaseLabel ?? "Locale"}
               </StatusBadge>
-              <Tooltip label={workspace}>
-                <span className="code-folder-chip">{rootName}</span>
+              <Tooltip label={`${workspace} · clicca per cambiare`}>
+                <button
+                  type="button"
+                  className="code-folder-chip"
+                  onClick={() => void chooseFolder()}
+                >
+                  {rootName}
+                </button>
               </Tooltip>
               <Popover
                 open={permOpen}
@@ -706,81 +753,8 @@ export function CodeView({ onNavigate }: CodeViewProps) {
                   {writeStatus?.label ?? "Chiede"}
                 </button>
               </Popover>
-              <div className="chat-think-tools">
-                <Tooltip label={thinkingOn ? "Spegni ragionamento" : "Accendi ragionamento"}>
-                  <Button
-                    variant="icon"
-                    className={cx(thinkingOn && "is-on")}
-                    aria-pressed={thinkingOn}
-                    aria-label={thinkingOn ? "Spegni ragionamento" : "Accendi ragionamento"}
-                    onClick={() => void changeThinking(!thinkingOn)}
-                  >
-                    <IconSpark size={15} />
-                  </Button>
-                </Tooltip>
-                <Tooltip label={showThinking ? "Nascondi ragionamento" : "Mostra ragionamento"}>
-                  <Button
-                    variant="icon"
-                    className={cx(showThinking && "is-on")}
-                    aria-pressed={showThinking}
-                    aria-label={showThinking ? "Nascondi ragionamento" : "Mostra ragionamento"}
-                    onClick={toggleShowThinking}
-                  >
-                    <IconEye size={15} />
-                  </Button>
-                </Tooltip>
-              </div>
             </div>
-            <Popover
-              open={menuOpen}
-              onClose={() => setMenuOpen(false)}
-              align="end"
-              content={
-                <>
-                  <MenuItem
-                    onSelect={() => {
-                      setMenuOpen(false);
-                      void chooseFolder();
-                    }}
-                  >
-                    Cambia cartella
-                  </MenuItem>
-                  <MenuItem
-                    onSelect={() => {
-                      setMenuOpen(false);
-                      onNavigate("models");
-                    }}
-                  >
-                    Cambia modello
-                  </MenuItem>
-                  {currentId && (
-                    <MenuItem
-                      danger
-                      onSelect={() => {
-                        setMenuOpen(false);
-                        void feedback
-                          .confirm({
-                            title: "Togliere questo lavoro?",
-                            description:
-                              "La conversazione sparisce da AInside. I file del progetto restano sul disco.",
-                            confirmLabel: "Togli",
-                            danger: true,
-                          })
-                          .then((ok) => {
-                            if (ok) void chats.remove(currentId);
-                          });
-                      }}
-                    >
-                      Togli questo lavoro
-                    </MenuItem>
-                  )}
-                </>
-              }
-            >
-              <Button variant="icon" aria-label="Menu codice" onClick={() => setMenuOpen((v) => !v)}>
-                <IconMore />
-              </Button>
-            </Popover>
+            <PreviewToggle />
           </header>
 
           {(runtime.error || snapshot?.phase === "errore") && (
@@ -842,7 +816,12 @@ export function CodeView({ onNavigate }: CodeViewProps) {
             </div>
           )}
 
-          <div className={cx("chat-log", (preview || previewError) && "is-preview")} aria-live="polite">
+          <div
+            className={cx("chat-log", (preview || previewError) && "is-preview")}
+            aria-live="polite"
+            ref={log.ref}
+            onScroll={log.onScroll}
+          >
             {preview || previewError ? (
               <CodePreview
                 file={preview}
@@ -959,68 +938,77 @@ export function CodeView({ onNavigate }: CodeViewProps) {
                 void onSend();
               }}
             >
-              <textarea
-                ref={area}
-                rows={1}
-                value={input}
-                disabled={!canChat(snapshot)}
-                placeholder={composerPlaceholder(
-                  snapshot,
-                  Boolean(active),
-                  "Cosa vuoi fare? @ per un file.",
+              <div className="chat-composer-field">
+                <textarea
+                  ref={area}
+                  rows={1}
+                  value={input}
+                  disabled={!canChat(snapshot)}
+                  placeholder={composerPlaceholder(
+                    snapshot,
+                    Boolean(active),
+                    "Cosa vuoi fare? @ per un file.",
+                  )}
+                  onChange={(event) => {
+                    setInput(event.target.value);
+                    resize();
+                    refreshMentions(event.target.value, event.target.selectionStart ?? 0);
+                  }}
+                  onKeyDown={(event) => {
+                    if (mentions.length > 0) {
+                      if (event.key === "ArrowDown") {
+                        event.preventDefault();
+                        setMentionIndex((index) => (index + 1) % mentions.length);
+                        return;
+                      }
+                      if (event.key === "ArrowUp") {
+                        event.preventDefault();
+                        setMentionIndex((index) => (index - 1 + mentions.length) % mentions.length);
+                        return;
+                      }
+                      if (event.key === "Enter" || event.key === "Tab") {
+                        event.preventDefault();
+                        pickMention(mentions[mentionIndex]?.rel ?? mentions[0].rel);
+                        return;
+                      }
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        setMentions([]);
+                        return;
+                      }
+                    }
+                    if (event.key === "Enter" && !event.shiftKey) {
+                      event.preventDefault();
+                      void onSend();
+                    }
+                  }}
+                />
+                {snapshot?.phase === "inRisposta" ? (
+                  <Button variant="primary" onClick={() => void runtime.stop()}>
+                    <IconStop size={14} />
+                    Stop
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    type="submit"
+                    disabled={!canChat(snapshot) || !input.trim()}
+                  >
+                    <IconSend size={14} />
+                    Invia
+                  </Button>
                 )}
-                onChange={(event) => {
-                  setInput(event.target.value);
-                  resize();
-                  refreshMentions(event.target.value, event.target.selectionStart ?? 0);
-                }}
-                onKeyDown={(event) => {
-                  if (mentions.length > 0) {
-                    if (event.key === "ArrowDown") {
-                      event.preventDefault();
-                      setMentionIndex((index) => (index + 1) % mentions.length);
-                      return;
-                    }
-                    if (event.key === "ArrowUp") {
-                      event.preventDefault();
-                      setMentionIndex((index) => (index - 1 + mentions.length) % mentions.length);
-                      return;
-                    }
-                    if (event.key === "Enter" || event.key === "Tab") {
-                      event.preventDefault();
-                      pickMention(mentions[mentionIndex]?.rel ?? mentions[0].rel);
-                      return;
-                    }
-                    if (event.key === "Escape") {
-                      event.preventDefault();
-                      setMentions([]);
-                      return;
-                    }
-                  }
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    void onSend();
-                  }
-                }}
+              </div>
+              <ComposerThinkTools
+                thinkingOn={thinkingOn}
+                showThinking={showThinking}
+                onToggleThinking={() => void changeThinking(!thinkingOn)}
+                onToggleShow={toggleShowThinking}
               />
-              {snapshot?.phase === "inRisposta" ? (
-                <Button variant="primary" onClick={() => void runtime.stop()}>
-                  <IconStop size={14} />
-                  Stop
-                </Button>
-              ) : (
-                <Button
-                  variant="primary"
-                  type="submit"
-                  disabled={!canChat(snapshot) || !input.trim()}
-                >
-                  <IconSend size={14} />
-                  Invia
-                </Button>
-              )}
             </form>
           </div>
         </div>
+        </PreviewHost>
       </div>
     </section>
   );

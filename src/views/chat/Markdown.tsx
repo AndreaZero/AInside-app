@@ -4,6 +4,7 @@ import {
   type MdBlock,
   type MdInline,
 } from "../../lib/markdown";
+import { CodeBlock } from "./CodeBlock";
 
 function Inline({ nodes }: { nodes: MdInline[] }) {
   return (
@@ -94,14 +95,7 @@ function Block({ block }: { block: MdBlock }) {
       );
     }
     case "code":
-      return (
-        <figure className="msg-code-wrap">
-          {block.lang ? <figcaption className="msg-code-lang">{block.lang}</figcaption> : null}
-          <pre className="msg-code">
-            <code>{block.v}</code>
-          </pre>
-        </figure>
-      );
+      return <CodeBlock lang={block.lang} code={block.v} />;
     case "ul":
       return (
         <ul>
