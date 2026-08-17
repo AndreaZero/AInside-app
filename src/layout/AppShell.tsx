@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useCatalog } from "../hooks/useCatalog";
 import { ChatProvider, useChats } from "../hooks/useChats";
 import { DownloadProvider } from "../hooks/useDownloads";
 import { HardwareProvider } from "../hooks/useHardwareProfile";
-import { LibraryProvider, useLibrarySnapshot } from "../hooks/useLibrary";
-import { RuntimeProvider } from "../hooks/useRuntime";
+import { LibraryProvider, useLibrary, useLibrarySnapshot } from "../hooks/useLibrary";
+import { RuntimeProvider, useRuntime } from "../hooks/useRuntime";
+import { useSettings } from "../hooks/useSettings";
 import { sessionsOfKind } from "../lib/chatGroups";
 import { sessionKind } from "../lib/chat";
 import { pickFolder } from "../lib/pickFolder";
@@ -16,6 +17,7 @@ import { MachineView } from "../views/MachineView";
 import { ModelsView } from "../views/ModelsView";
 import { SettingsView } from "../views/SettingsView";
 import { FeedbackBridge } from "./FeedbackBridge";
+import { RuntimeBanner } from "./RuntimeBanner";
 import { Sidebar } from "./Sidebar";
 
 export function AppShell() {
@@ -27,6 +29,7 @@ export function AppShell() {
             <HardwareProvider>
               <FeedbackBridge />
               <CatalogBoot />
+              <RuntimeBoot />
               <AppFrame />
             </HardwareProvider>
           </ChatProvider>
@@ -38,6 +41,66 @@ export function AppShell() {
 
 function CatalogBoot() {
   useCatalog();
+  return null;
+}
+
+function RuntimeBoot() {
+  const library = useLibrary();
+  const runtime = useRuntime();
+  const { settings } = useSettings();
+  const snapshot = runtime.snapshot;
+  const failed = useRef<string | null>(null);
+
+  useEffect(() => {
+    const lib = library.snapshot;
+    if (!lib) return;
+
+    const active = lib.items.find(
+      (item) =>
+        item.variantId === lib.active?.variantId && item.active && item.status === "pronto",
+    );
+    const phase = snapshot?.phase;
+    if (!active) {
+      if (phase === "pronto" || phase === "motore" || phase === "avvio" || phase === "inRisposta") {
+        void runtime.unload();
+      }
+      return;
+    }
+
+    if (phase === "motore" || phase === "avvio" || phase === "inRisposta") {
+      return;
+    }
+
+    const profile = settings?.profile;
+    const sameModel = snapshot?.variantId === active.variantId;
+    const sameProfile = !profile || !snapshot?.profile || snapshot.profile === profile;
+    const key = `${active.variantId}:${profile ?? ""}`;
+
+    if (phase === "pronto" && sameModel && sameProfile) {
+      failed.current = null;
+      return;
+    }
+    if (phase === "errore") {
+      const failedKey = `${snapshot?.variantId ?? ""}:${snapshot?.profile ?? profile ?? ""}`;
+      failed.current = failedKey;
+      if (failedKey === key) {
+        return;
+      }
+    }
+
+    void runtime.load().catch(() => {
+      failed.current = key;
+    });
+  }, [
+    library.snapshot,
+    snapshot?.phase,
+    snapshot?.variantId,
+    snapshot?.profile,
+    settings?.profile,
+    runtime.load,
+    runtime.unload,
+  ]);
+
   return null;
 }
 
@@ -99,6 +162,7 @@ function AppFrame() {
         onNewCode={() => void openNewCode()}
       />
       <main className="stage">
+        <RuntimeBanner />
         <div className="stage-page" key={route}>
           {route === "machine" && <MachineView onNavigate={setRoute} />}
           {route === "models" && <ModelsView onNavigate={setRoute} />}

@@ -194,7 +194,8 @@ pub fn workspace_preview(root: String, text: String) -> Result<Vec<EditPreview>,
     if root.trim().is_empty() {
         return Err("Apri una cartella del progetto.".into());
     }
-    Ok(preview_edits(&root, &text))
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| preview_edits(&root, &text)))
+        .map_err(|_| "Non riesco a leggere le modifiche in questa risposta.".to_string())
 }
 
 #[tauri::command]

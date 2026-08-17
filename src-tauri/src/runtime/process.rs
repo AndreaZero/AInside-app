@@ -1,6 +1,7 @@
-use std::io::{BufRead, BufReader};
+use std::io::Read;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -8,6 +9,7 @@ use std::time::{Duration, Instant};
 use super::config::LaunchConfig;
 
 const HEALTH_WAIT: Duration = Duration::from_secs(300);
+const LOG_CAP: usize = 32 * 1024;
 
 pub struct ServerProcess {
     child: Child,
@@ -69,7 +71,8 @@ impl ServerProcess {
             thread::spawn(move || drain_pipe(pipe, Some(sink)));
         }
         if let Some(pipe) = child.stdout.take() {
-            thread::spawn(move || drain_pipe(pipe, None));
+            let sink = Arc::clone(&stderr);
+            thread::spawn(move || drain_pipe(pipe, Some(sink)));
         }
 
         Ok(Self {
@@ -102,7 +105,11 @@ impl Drop for ServerProcess {
     }
 }
 
-pub fn wait_ready(server: &mut ServerProcess) -> Result<(), String> {
+pub fn wait_ready(
+    server: &mut ServerProcess,
+    cancel: &AtomicBool,
+    mut on_tick: impl FnMut(Duration, &str),
+) -> Result<(), String> {
     let url = format!("http://127.0.0.1:{}/health", server.port);
     let client = reqwest::blocking::Client::builder()
         .user_agent("AInside/0.1 (desktop; Windows)")
@@ -112,9 +119,15 @@ pub fn wait_ready(server: &mut ServerProcess) -> Result<(), String> {
         .map_err(|e| format!("Non controllo il motore: {e}"))?;
 
     let started = Instant::now();
+    let mut last_tick = Instant::now() - Duration::from_secs(1);
+    on_tick(Duration::ZERO, &server.last_error());
+
     loop {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("Ho fermato l’avvio.".into());
+        }
         if !server.alive() {
-            let detail = server.last_error();
+            let detail = display_log(&server.last_error());
             return Err(if detail.is_empty() {
                 "Il motore si è chiuso durante l’avvio.".into()
             } else {
@@ -122,7 +135,23 @@ pub fn wait_ready(server: &mut ServerProcess) -> Result<(), String> {
             });
         }
         if started.elapsed() > HEALTH_WAIT {
-            return Err("Il modello ci ha messo troppo a entrare in memoria.".into());
+            let detail = display_log(&server.last_error());
+            return Err(if detail.is_empty() {
+                format!(
+                    "Il modello ci ha messo troppo a entrare in memoria ({}). Il motore non ha scritto nulla: spesso è un blocco della scheda grafica o un file troppo grande per questo PC.",
+                    format_elapsed(started.elapsed())
+                )
+            } else {
+                format!(
+                    "Il modello ci ha messo troppo a entrare in memoria ({}).\n\n{detail}",
+                    format_elapsed(started.elapsed())
+                )
+            });
+        }
+
+        if last_tick.elapsed() >= Duration::from_millis(900) {
+            last_tick = Instant::now();
+            on_tick(started.elapsed(), &server.last_error());
         }
 
         match client.get(&url).send() {
@@ -142,19 +171,126 @@ pub fn wait_ready(server: &mut ServerProcess) -> Result<(), String> {
     }
 }
 
-fn drain_pipe<R: std::io::Read>(pipe: R, sink: Option<Arc<Mutex<String>>>) {
-    let mut reader = BufReader::new(pipe);
-    let mut line = String::new();
-    while reader.read_line(&mut line).ok().is_some_and(|n| n > 0) {
-        if let Some(sink) = &sink {
-            if let Ok(mut text) = sink.lock() {
-                text.push_str(&line);
-                let extra = text.len().saturating_sub(8 * 1024);
-                if extra > 0 {
-                    text.drain(..extra);
-                }
+pub(crate) fn format_elapsed(elapsed: Duration) -> String {
+    let secs = elapsed.as_secs();
+    if secs < 60 {
+        format!("{secs}s")
+    } else {
+        format!("{}m {:02}s", secs / 60, secs % 60)
+    }
+}
+
+pub(crate) fn needs_newer_engine(text: &str) -> bool {
+    let t = text.to_ascii_lowercase();
+    t.contains("unknown model architecture") || t.contains("unknown architecture")
+}
+
+pub(crate) fn port_in_use(text: &str) -> bool {
+    let t = text.to_ascii_lowercase();
+    t.contains("address already in use")
+        || t.contains("only one usage of each socket")
+        || t.contains("eaddrinuse")
+        || t.contains("error 10048")
+        || t.contains("(os error 10048)")
+        || t.contains("wsaeaddrinuse")
+}
+
+pub(crate) fn display_log(text: &str) -> String {
+    let lines: Vec<&str> = text
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+    let slice = if lines.len() > 24 {
+        &lines[lines.len() - 24..]
+    } else {
+        &lines
+    };
+    let joined = slice.join("\n");
+    if joined.len() <= 4000 {
+        return joined;
+    }
+    let mut idx = joined.len().saturating_sub(4000);
+    while idx < joined.len() && !joined.is_char_boundary(idx) {
+        idx += 1;
+    }
+    format!("…{}", &joined[idx..])
+}
+
+fn drain_pipe<R: Read>(mut pipe: R, sink: Option<Arc<Mutex<String>>>) {
+    let mut buf = [0u8; 2048];
+    let mut leftover = Vec::new();
+    loop {
+        let n = match pipe.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => n,
+            Err(_) => break,
+        };
+        leftover.extend_from_slice(&buf[..n]);
+        loop {
+            let Some(pos) = leftover.iter().position(|&b| b == b'\n' || b == b'\r') else {
+                break;
+            };
+            let mut line = leftover.drain(..=pos).collect::<Vec<_>>();
+            let _ = line.pop();
+            if line.last() == Some(&b'\r') {
+                let _ = line.pop();
             }
+            if line.is_empty() {
+                continue;
+            }
+            append_log(&sink, &String::from_utf8_lossy(&line));
         }
-        line.clear();
+        if leftover.len() > 8 * 1024 {
+            leftover.drain(..leftover.len() - 4096);
+        }
+    }
+    if !leftover.is_empty() {
+        append_log(&sink, &String::from_utf8_lossy(&leftover));
+    }
+}
+
+fn append_log(sink: &Option<Arc<Mutex<String>>>, chunk: &str) {
+    let Some(sink) = sink else {
+        return;
+    };
+    let Ok(mut text) = sink.lock() else {
+        return;
+    };
+    text.push_str(chunk);
+    text.push('\n');
+    let extra = text.len().saturating_sub(LOG_CAP);
+    if extra > 0 {
+        text.drain(..extra);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn detects_busy_port() {
+        assert!(port_in_use("error: Address already in use"));
+        assert!(port_in_use("Only one usage of each socket address is normally permitted. (os error 10048)"));
+        assert!(!port_in_use("failed to load model"));
+        assert!(needs_newer_engine(
+            "error loading model: unknown model architecture: 'qwen35'"
+        ));
+        assert!(!needs_newer_engine("failed to allocate buffer"));
+    }
+
+    #[test]
+    fn keeps_last_log_lines() {
+        let log = (0..40).map(|i| format!("line {i}")).collect::<Vec<_>>().join("\n");
+        let shown = display_log(&log);
+        assert!(shown.contains("line 39"));
+        assert!(!shown.contains("line 0"));
+    }
+
+    #[test]
+    fn formats_wait() {
+        assert_eq!(format_elapsed(Duration::from_secs(9)), "9s");
+        assert_eq!(format_elapsed(Duration::from_secs(75)), "1m 15s");
     }
 }

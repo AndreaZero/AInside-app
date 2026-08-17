@@ -27,6 +27,7 @@ pub struct LaunchPlan {
     pub profile: PerfProfile,
     pub outcome: String,
     pub detail: String,
+    pub ram_bytes: u64,
 }
 
 pub fn plan(
@@ -35,11 +36,21 @@ pub fn plan(
     profile: PerfProfile,
     weights: u64,
 ) -> Result<LaunchPlan, String> {
+    plan_with_reclaim(hardware, kind, profile, weights, 0)
+}
+
+pub fn plan_with_reclaim(
+    hardware: &HardwareReport,
+    kind: EngineKind,
+    profile: PerfProfile,
+    weights: u64,
+    reclaim: u64,
+) -> Result<LaunchPlan, String> {
     if weights == 0 {
         return Err("Non misuro il file del modello.".into());
     }
 
-    let budget = Budget::from_hardware(hardware, profile);
+    let budget = Budget::from_hardware(hardware, profile, reclaim, weights);
     let mut context = start_context(profile);
     let mut batch = start_batch(profile);
     let mut ngl: u32 = if kind == EngineKind::Cpu { 0 } else { 99 };
@@ -60,17 +71,21 @@ pub fn plan(
             return Ok(LaunchPlan {
                 outcome: outcome_it(profile, kind, ngl, context, start_context(profile), &est, &budget),
                 detail: format!(
-                    "profilo={} context={} batch={} ngl={} thread={} ram~{} vram~{}",
+                    "profilo={} context={} batch={} ngl={} thread={} ram~{} vram~{} liberi={} recupero={} mmap={}",
                     profile.label_it(),
                     context,
                     batch,
                     ngl,
                     threads,
                     human(est.ram),
-                    human(est.vram)
+                    human(est.vram),
+                    human(budget.free),
+                    human(reclaim),
+                    human(weights),
                 ),
                 profile,
                 config,
+                ram_bytes: est.ram,
             });
         }
 
@@ -89,10 +104,7 @@ pub fn plan(
         break;
     }
 
-    Err(
-        "Con questo profilo il modello non sta in memoria. Prova Risparmio o un modello più piccolo."
-            .into(),
-    )
+    Err(refuse_msg(hardware, kind, profile, weights, reclaim, &budget))
 }
 
 pub fn apply_expert(mut plan: LaunchPlan, expert: &ExpertSettings) -> LaunchPlan {
@@ -131,6 +143,38 @@ pub fn apply_expert(mut plan: LaunchPlan, expert: &ExpertSettings) -> LaunchPlan
     plan
 }
 
+fn refuse_msg(
+    hardware: &HardwareReport,
+    kind: EngineKind,
+    profile: PerfProfile,
+    weights: u64,
+    reclaim: u64,
+    budget: &Budget,
+) -> String {
+    let ngl = if kind == EngineKind::Cpu { 0 } else { 35 };
+    let need = estimate(weights, MIN_CONTEXT, 128, ngl, kind);
+    let total = hardware.memory.total_bytes.unwrap_or(0);
+    let available = hardware.memory.available_bytes.unwrap_or(0);
+    let other = if reclaim > 0 {
+        format!(
+            " Ho appena spento l’altro modello (~{}), quella RAM deve tornare al sistema.",
+            human(reclaim)
+        )
+    } else {
+        String::new()
+    };
+    format!(
+        "Il file è {} e a stretto servono circa {} di RAM. Usabili {} su {} totali (Windows ne dà {} liberi ora; il file sul disco spesso risulta “occupato” in cache, ma llama.cpp lo rilegge da lì, non lo ricopia).{} Se Chrome o altri programmi tengono davvero la memoria, chiudili e riprova. Altrimenti Risparmio o un modello più piccolo. Profilo: {}.",
+        human(weights),
+        human(need.ram),
+        human(budget.ram),
+        human(total),
+        human(available),
+        other,
+        profile.label_it(),
+    )
+}
+
 pub fn device_label(kind: EngineKind) -> &'static str {
     match kind {
         EngineKind::Vulkan => "Scheda grafica",
@@ -141,6 +185,7 @@ pub fn device_label(kind: EngineKind) -> &'static str {
 struct Budget {
     ram: u64,
     vram: u64,
+    free: u64,
 }
 
 struct Estimate {
@@ -155,13 +200,25 @@ impl Estimate {
 }
 
 impl Budget {
-    fn from_hardware(hardware: &HardwareReport, profile: PerfProfile) -> Self {
+    fn from_hardware(
+        hardware: &HardwareReport,
+        profile: PerfProfile,
+        reclaim: u64,
+        mmap_file: u64,
+    ) -> Self {
         let ram_total = hardware.memory.total_bytes.filter(|&b| b > 0).unwrap_or(8 * GIB);
-        let ram_free = hardware
+        let available = hardware
             .memory
             .available_bytes
             .filter(|&b| b > 0)
             .unwrap_or(ram_total.saturating_mul(60) / 100);
+        // GGUF file-backed: Windows tiene il download in cache e lo sottrae
+        // ai “GB liberi”. llama.cpp fa mmap dello stesso file, non una seconda copia.
+        // L’altro modello che spegniamo (reclaim) non si somma: è lo stesso slot.
+        let ram_free = available
+            .saturating_add(reclaim)
+            .saturating_add(mmap_file)
+            .min(ram_total.saturating_sub(GIB));
         let vram = hardware
             .gpus
             .iter()
@@ -175,11 +232,17 @@ impl Budget {
             PerfProfile::Massime => (75, 90, ram_total / 6),
         };
         let leave = leave.max(2 * GIB);
-        let ram = (ram_free.saturating_mul(ram_use) / 100)
+        let by_profile = ram_total.saturating_mul(ram_use) / 100;
+        let ram = by_profile
+            .min(ram_free)
             .min(ram_total.saturating_sub(leave));
         let vram = vram.saturating_mul(vram_use) / 100;
 
-        Self { ram, vram }
+        Self {
+            ram,
+            vram,
+            free: ram_free,
+        }
     }
 }
 
@@ -409,7 +472,39 @@ mod tests {
             10 * GIB,
         )
         .unwrap_err();
-        assert!(err.contains("non sta"));
+        assert!(err.contains("servono circa") || err.contains("non sta"));
+        assert!(err.contains("8") || err.contains("RAM"));
+    }
+
+    #[test]
+    fn cached_gguf_is_not_counted_twice() {
+        let mut machine = hw(32, 12, 16, true);
+        machine.memory.available_bytes = Some((7 * GIB) + (100 * MIB));
+        let plan = plan(
+            &machine,
+            EngineKind::Vulkan,
+            PerfProfile::Bilanciato,
+            16 * GIB,
+        );
+        assert!(
+            plan.is_ok(),
+            "32 GB, file 16 GB già in cache, 7 GB “liberi”: deve partire. {:?}",
+            plan.err()
+        );
+    }
+
+    #[test]
+    fn reclaim_helps_when_the_next_file_is_small() {
+        let mut machine = hw(32, 12, 16, true);
+        machine.memory.available_bytes = Some(2 * GIB);
+        let ok = plan_with_reclaim(
+            &machine,
+            EngineKind::Vulkan,
+            PerfProfile::Bilanciato,
+            5 * GIB,
+            8 * GIB,
+        );
+        assert!(ok.is_ok(), "{:?}", ok.err());
     }
 
     #[test]

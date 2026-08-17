@@ -74,22 +74,29 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
 
   const load = useCallback(async () => {
     try {
-      setSnapshot(await loadRuntime());
       setError(null);
+      await loadRuntime();
+      setSnapshot(await getRuntime());
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Non accendo il modello.";
+      const message = err instanceof Error ? err.message : "Non carico il modello.";
       setError(message);
+      try {
+        setSnapshot(await getRuntime());
+      } catch {
+        /* lo snapshot resta quello degli eventi */
+      }
       throw new Error(message);
     }
   }, []);
 
   const unload = useCallback(async () => {
     try {
-      setSnapshot(await unloadRuntime());
+      await unloadRuntime();
+      setSnapshot(await getRuntime());
       setReply("");
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Non spengo il modello.");
+      setError(err instanceof Error ? err.message : "Non fermo il modello.");
     }
   }, []);
 

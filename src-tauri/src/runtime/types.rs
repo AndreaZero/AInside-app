@@ -27,6 +27,7 @@ pub struct RuntimeSnapshot {
     pub received_bytes: u64,
     pub expected_bytes: u64,
     pub error_detail: Option<String>,
+    pub log: Option<String>,
     pub outcome: Option<String>,
     pub profile_label: Option<String>,
     pub profile: Option<PerfProfile>,
@@ -59,6 +60,7 @@ impl RuntimeSnapshot {
             received_bytes: 0,
             expected_bytes: 0,
             error_detail: None,
+            log: None,
             outcome: None,
             profile_label: None,
             profile: None,
@@ -72,6 +74,19 @@ impl RuntimeSnapshot {
         if phase != RuntimePhase::Errore {
             self.error_detail = None;
         }
+        if matches!(phase, RuntimePhase::Pronto | RuntimePhase::Spento) {
+            self.log = None;
+        }
+        self
+    }
+
+    pub fn with_log(mut self, log: impl Into<String>) -> Self {
+        let text = log.into();
+        self.log = if text.trim().is_empty() {
+            None
+        } else {
+            Some(text)
+        };
         self
     }
 

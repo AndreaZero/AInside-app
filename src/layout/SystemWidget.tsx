@@ -28,6 +28,9 @@ export function SystemWidget() {
   const ram = ramUsedRatio(hardware.memory.totalBytes, hardware.memory.availableBytes);
   const tone =
     performance === "limited" ? "is-bad" : performance === "fair" ? "is-warn" : undefined;
+  const snap = runtime.snapshot;
+  const loading =
+    snap?.phase === "motore" || snap?.phase === "avvio" || snap?.phase === "errore";
 
   return (
     <div className="sys-card">
@@ -36,7 +39,7 @@ export function SystemWidget() {
           <p className="sys-kicker">Prestazioni AI</p>
           <p className="sys-score">{performanceLabel}</p>
         </div>
-        <span className={cx("sys-dot", tone)} />
+        <span className={cx("sys-dot", tone, loading && "is-warn")} />
       </div>
       <div className="sys-meters">
         <MiniMeter
@@ -63,6 +66,7 @@ export function SystemWidget() {
           tone="success"
         />
       </div>
+      {loading && snap ? <p className="sys-runtime">{snap.message}</p> : null}
     </div>
   );
 }

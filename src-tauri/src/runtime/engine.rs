@@ -12,13 +12,16 @@ use crate::hardware::HardwareReport;
 
 const USER_AGENT: &str = "AInside/0.1 (desktop; Windows)";
 const RELEASES_API: &str = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest";
-const FALLBACK_TAG: &str = "b10278";
+/// Qwen 3.8 (`qwen35`) e i GGUF del catalogo 2026-08 richiedono almeno b10355.
+const MIN_ENGINE_BUILD: u32 = 10355;
+const FALLBACK_TAG: &str = "b10456";
 const FALLBACK_VULKAN: &str =
-    "https://github.com/ggml-org/llama.cpp/releases/download/b10278/llama-b10278-bin-win-vulkan-x64.zip";
+    "https://github.com/ggml-org/llama.cpp/releases/download/b10456/llama-b10456-bin-win-vulkan-x64.zip";
 const FALLBACK_CPU: &str =
-    "https://github.com/ggml-org/llama.cpp/releases/download/b10278/llama-b10278-bin-win-cpu-x64.zip";
+    "https://github.com/ggml-org/llama.cpp/releases/download/b10456/llama-b10456-bin-win-cpu-x64.zip";
 const FALLBACK_CPU_ARM: &str =
-    "https://github.com/ggml-org/llama.cpp/releases/download/b10278/llama-b10278-bin-win-cpu-arm64.zip";
+    "https://github.com/ggml-org/llama.cpp/releases/download/b10456/llama-b10456-bin-win-cpu-arm64.zip";
+const TAG_FILE: &str = "engine.tag";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EngineKind {
@@ -78,26 +81,42 @@ pub fn ensure(
     app_data: &Path,
     hardware: &HardwareReport,
     cancel: &std::sync::atomic::AtomicBool,
+    force: bool,
     mut on_progress: impl FnMut(EngineKind, u64, u64, &str),
 ) -> Result<EngineSpec, String> {
     let kind = choose_kind(hardware);
     let dir = runtime_root(app_data).join(kind.folder());
     fs::create_dir_all(&dir).map_err(|e| format!("Non creo la cartella del motore: {e}"))?;
 
-    if let Some(exe) = find_server(&dir) {
-        on_progress(kind, 1, 1, "Motore già sul disco.");
-        return Ok(EngineSpec { kind, exe });
+    if !force {
+        if let Some(exe) = find_server(&dir) {
+            if engine_is_current(&dir) {
+                on_progress(kind, 1, 1, "Motore già sul disco.");
+                return Ok(EngineSpec { kind, exe });
+            }
+            on_progress(
+                kind,
+                0,
+                0,
+                "Il motore sul disco è vecchio per i modelli nuovi. Lo aggiorno.",
+            );
+        }
+    } else {
+        on_progress(kind, 0, 0, "Scarico un motore llama.cpp più recente.");
     }
 
-    let (url, expected) = resolve_url(kind, &hardware.os.arch)?;
+    on_progress(kind, 0, 0, "Cerco il motore ufficiale llama.cpp.");
+    let (url, expected, tag) = resolve_url(kind, &hardware.os.arch)?;
     on_progress(kind, 0, expected, "Prendo il motore ufficiale di llama.cpp.");
     let zip_path = dir.join("engine.zip");
     download_zip(&url, &zip_path, expected, cancel, |got| {
         on_progress(kind, got, expected, "Scarico il motore locale.");
     })?;
     on_progress(kind, expected.max(1), expected.max(1), "Apro il motore.");
+    clear_engine_dir(&dir)?;
     unzip(&zip_path, &dir)?;
     let _ = fs::remove_file(&zip_path);
+    write_tag(&dir, &tag);
 
     let exe = find_server(&dir).ok_or_else(|| {
         "Ho scaricato il motore ma non trovo il programma di avvio.".to_string()
@@ -105,15 +124,19 @@ pub fn ensure(
     Ok(EngineSpec { kind, exe })
 }
 
-fn resolve_url(kind: EngineKind, arch: &str) -> Result<(String, u64), String> {
+fn resolve_url(kind: EngineKind, arch: &str) -> Result<(String, u64, String), String> {
     match fetch_latest(kind, arch) {
-        Ok(found) => Ok(found),
-        Err(_) => Ok((fallback_url(kind, arch).to_string(), 0)),
+        Ok(found) if parse_build(&found.2).unwrap_or(0) >= MIN_ENGINE_BUILD => Ok(found),
+        _ => Ok((
+            fallback_url(kind, arch).to_string(),
+            0,
+            FALLBACK_TAG.to_string(),
+        )),
     }
 }
 
-fn fetch_latest(kind: EngineKind, arch: &str) -> Result<(String, u64), String> {
-    let client = http_client()?;
+fn fetch_latest(kind: EngineKind, arch: &str) -> Result<(String, u64, String), String> {
+    let client = api_client()?;
     let raw = client
         .get(RELEASES_API)
         .header("Accept", "application/vnd.github+json")
@@ -131,7 +154,11 @@ fn fetch_latest(kind: EngineKind, arch: &str) -> Result<(String, u64), String> {
     if !allowed_url(&asset.browser_download_url) {
         return Err("L’indirizzo del motore non è quello ufficiale.".into());
     }
-    Ok((asset.browser_download_url.clone(), asset.size))
+    Ok((
+        asset.browser_download_url.clone(),
+        asset.size,
+        release.tag_name,
+    ))
 }
 
 fn pick_asset<'a>(assets: &'a [GithubAsset], needle: &str) -> Option<&'a GithubAsset> {
@@ -169,7 +196,7 @@ fn download_zip(
         let _ = fs::remove_file(dest);
     }
 
-    let client = http_client()?;
+    let client = download_client()?;
     let mut response = client.get(url).send().map_err(rete)?.error_for_status().map_err(rete)?;
     let total = expected.max(response.content_length().unwrap_or(0));
     let part = dest.with_extension("zip.part");
@@ -248,12 +275,63 @@ fn find_server(dir: &Path) -> Option<PathBuf> {
     None
 }
 
-fn http_client() -> Result<reqwest::blocking::Client, String> {
+fn engine_is_current(dir: &Path) -> bool {
+    parse_build(&read_tag(dir).unwrap_or_default()).unwrap_or(0) >= MIN_ENGINE_BUILD
+}
+
+fn read_tag(dir: &Path) -> Option<String> {
+    fs::read_to_string(dir.join(TAG_FILE))
+        .ok()
+        .map(|text| text.trim().to_string())
+        .filter(|text| !text.is_empty())
+}
+
+fn write_tag(dir: &Path, tag: &str) {
+    let _ = fs::write(dir.join(TAG_FILE), tag.trim());
+}
+
+pub(crate) fn parse_build(tag: &str) -> Option<u32> {
+    tag.trim()
+        .trim_start_matches(['b', 'B'])
+        .parse::<u32>()
+        .ok()
+}
+
+fn clear_engine_dir(dir: &Path) -> Result<(), String> {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return Ok(());
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name();
+        if name == "engine.zip" || name == "engine.zip.part" || name == TAG_FILE {
+            continue;
+        }
+        let result = if path.is_dir() {
+            fs::remove_dir_all(&path)
+        } else {
+            fs::remove_file(&path)
+        };
+        result.map_err(|e| format!("Non sostituisco il motore vecchio: {e}"))?;
+    }
+    Ok(())
+}
+
+fn api_client() -> Result<reqwest::blocking::Client, String> {
+    reqwest::blocking::Client::builder()
+        .user_agent(USER_AGENT)
+        .connect_timeout(Duration::from_secs(8))
+        .timeout(Duration::from_secs(12))
+        .build()
+        .map_err(rete)
+}
+
+fn download_client() -> Result<reqwest::blocking::Client, String> {
     reqwest::blocking::Client::builder()
         .user_agent(USER_AGENT)
         .redirect(reqwest::redirect::Policy::limited(16))
-        .connect_timeout(Duration::from_secs(30))
-        .timeout(None)
+        .connect_timeout(Duration::from_secs(20))
+        .timeout(Duration::from_secs(600))
         .build()
         .map_err(rete)
 }
@@ -297,6 +375,15 @@ mod tests {
     #[test]
     fn rejects_foreign_urls() {
         assert!(!allowed_url("https://evil.example/llama.zip"));
+    }
+
+    #[test]
+    fn parses_llama_cpp_build() {
+        assert_eq!(parse_build("b10456"), Some(10456));
+        assert_eq!(parse_build("b10278"), Some(10278));
+        assert!(parse_build("b10278").unwrap() < MIN_ENGINE_BUILD);
+        assert!(parse_build("b10456").unwrap() >= MIN_ENGINE_BUILD);
+        assert_eq!(parse_build("nope"), None);
     }
 
     fn dummy_hw() -> crate::hardware::HardwareReport {

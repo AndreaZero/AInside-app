@@ -294,6 +294,13 @@
   gap: 8px;
 }
 
+.sys-runtime {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
 .dl-dock {
   position: relative;
   isolation: isolate;
@@ -416,13 +423,106 @@
   flex: 1;
   min-width: 0;
   display: flex;
+  flex-direction: column;
   overflow: hidden;
+}
+
+.runtime-strip {
+  flex-shrink: 0;
+  z-index: 4;
+  padding: 10px 22px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+}
+
+.runtime-strip.is-error {
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.runtime-strip-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.runtime-strip-row p {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.runtime-strip-bytes {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.runtime-strip-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--warning);
+}
+
+.runtime-strip-dot.is-pulse {
+  background: var(--accent-cyan);
+  box-shadow: 0 0 8px rgba(34, 211, 238, 0.55);
+  animation: runtime-pulse 1.2s ease-in-out infinite;
+}
+
+.runtime-strip.is-error .runtime-strip-dot {
+  background: var(--danger);
+}
+
+.runtime-strip-note {
+  margin: 6px 0 0 18px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.runtime-strip-log {
+  margin: 8px 0 0 18px;
+}
+
+.runtime-strip-log summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.runtime-strip-log pre {
+  margin: 8px 0 0;
+  max-height: 160px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+@keyframes runtime-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .stage-page {
   flex: 1;
   min-width: 0;
-  min-height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: auto;
@@ -435,7 +535,6 @@
 
 .stage-page:has(.page--fill) {
   overflow: hidden;
-  height: 100%;
 }
 
 .page {

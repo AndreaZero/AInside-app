@@ -18,6 +18,7 @@ export type RuntimeSnapshot = {
   receivedBytes: number;
   expectedBytes: number;
   errorDetail: string | null;
+  log?: string | null;
   outcome: string | null;
   profileLabel: string | null;
   profile: "risparmio" | "bilanciato" | "massime" | null;
@@ -42,4 +43,16 @@ export function isBusy(snapshot: RuntimeSnapshot | null): boolean {
 
 export function canChat(snapshot: RuntimeSnapshot | null): boolean {
   return snapshot?.phase === "pronto";
+}
+
+export function composerPlaceholder(
+  snapshot: RuntimeSnapshot | null,
+  hasModel: boolean,
+  ready: string,
+): string {
+  if (canChat(snapshot)) return ready;
+  if (isBusy(snapshot)) return "Un momento, sto preparando il modello…";
+  if (snapshot?.phase === "errore") return "Il modello non è partito. Riprova, o scegline un altro.";
+  if (hasModel) return "Sto preparando il modello…";
+  return "Scegli un modello per scrivere.";
 }

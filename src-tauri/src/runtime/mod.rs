@@ -11,10 +11,11 @@ pub use stream::apply_thinking;
 pub use types::{ChatTurn, RuntimeSnapshot, TokenChunk};
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -22,9 +23,11 @@ use crate::hardware;
 use crate::library;
 use crate::settings;
 
-use config::{apply_expert, device_label, plan, LaunchPlan, INTERNAL_PORT};
+use config::{apply_expert, device_label, plan_with_reclaim, LaunchPlan, INTERNAL_PORT};
 use engine::EngineKind;
-use process::{wait_ready, ServerProcess};
+use process::{
+    display_log, format_elapsed, needs_newer_engine, port_in_use, wait_ready, ServerProcess,
+};
 use types::{RuntimePhase, RuntimeSnapshot as Snapshot};
 
 const EVENT: &str = "runtime-update";
@@ -44,6 +47,7 @@ struct Inner {
     loading: bool,
     generating: bool,
     context_tokens: u32,
+    reserved_ram: u64,
 }
 
 impl Default for Snapshot {
@@ -96,6 +100,7 @@ impl RuntimeManager {
         inner.loading = false;
         inner.generating = false;
         inner.context_tokens = 0;
+        inner.reserved_ram = 0;
         inner.snapshot = Snapshot::spento();
     }
 }
@@ -120,33 +125,58 @@ pub fn load_runtime(app: AppHandle, manager: State<RuntimeManager>) -> Result<Ru
     }
 
     let target = active_model(&app)?;
-    if current.phase == RuntimePhase::Pronto && current.variant_id.as_deref() == Some(&target.variant_id)
+    let profile = settings::profile(&app).ok();
+    if current.phase == RuntimePhase::Pronto
+        && current.variant_id.as_deref() == Some(&target.variant_id)
+        && profile.is_some()
+        && current.profile == profile
     {
         return Ok(current);
     }
 
-    {
+    let (mut reclaim, prev_variant, had_server, previous) = {
         let mut inner = manager.inner.lock().expect("runtime lock");
         if inner.loading {
             return Ok(inner.snapshot.clone());
         }
         inner.loading = true;
         inner.cancel_load.store(false, Ordering::Relaxed);
-        inner.server = None;
+        let had_server = inner.server.is_some();
+        let previous = inner.server.take();
+        let reclaim = inner.reserved_ram;
+        inner.reserved_ram = 0;
+        let prev_variant = inner.snapshot.variant_id.clone();
+        let message = if had_server {
+            "Libero la memoria dell’altro modello."
+        } else {
+            "Controllo la memoria libera."
+        };
         inner.snapshot = Snapshot {
             model_name: Some(target.model_name.clone()),
             model_id: Some(target.model_id.clone()),
             variant_id: Some(target.variant_id.clone()),
-            ..Snapshot::spento().with_phase(RuntimePhase::Motore, "Preparo il motore locale.")
+            ..Snapshot::spento().with_phase(RuntimePhase::Motore, message)
         };
-    }
+        (reclaim, prev_variant, had_server, previous)
+    };
     let started = manager.snapshot();
     let _ = app.emit(EVENT, &started);
+
+    if reclaim == 0 && had_server {
+        if let Some(id) = prev_variant {
+            if let Ok(library) = library::list_library(app.clone()) {
+                if let Some(item) = library.items.iter().find(|item| item.variant_id == id) {
+                    reclaim = fs::metadata(&item.path).map(|m| m.len()).unwrap_or(0);
+                }
+            }
+        }
+    }
 
     let app2 = app.clone();
     let mgr = manager.inner().clone();
     thread::spawn(move || {
-        let result = load_inner(&app2, &mgr, target);
+        drop(previous);
+        let result = load_inner(&app2, &mgr, target, reclaim);
         mgr.set_loading(false);
         match result {
             Ok(snapshot) => {
@@ -383,13 +413,42 @@ fn active_model(app: &AppHandle) -> Result<ActiveTarget, String> {
     })
 }
 
-fn load_inner(app: &AppHandle, manager: &RuntimeManager, target: ActiveTarget) -> Result<Snapshot, String> {
+fn load_inner(
+    app: &AppHandle,
+    manager: &RuntimeManager,
+    target: ActiveTarget,
+    reclaim: u64,
+) -> Result<Snapshot, String> {
+    let cancel = manager.inner.lock().expect("runtime lock").cancel_load.clone();
+    if reclaim > 0 {
+        manager.publish(
+            app,
+            Snapshot {
+                model_name: Some(target.model_name.clone()),
+                model_id: Some(target.model_id.clone()),
+                variant_id: Some(target.variant_id.clone()),
+                ..Snapshot::spento()
+                    .with_phase(RuntimePhase::Motore, "Aspetto che la RAM dell’altro modello si liberi.")
+            },
+        );
+        wait_ram_reclaim(reclaim, &cancel);
+    }
+    manager.publish(
+        app,
+        Snapshot {
+            model_name: Some(target.model_name.clone()),
+            model_id: Some(target.model_id.clone()),
+            variant_id: Some(target.variant_id.clone()),
+            ..Snapshot::spento().with_phase(RuntimePhase::Motore, "Controllo il file del modello.")
+        },
+    );
+
     let hardware = hardware::get_hardware();
+    let kind = engine::choose_kind(&hardware);
     let profile = settings::profile(app)?;
     let weights = fs::metadata(&target.path).map(|m| m.len()).unwrap_or(0);
-    let kind = engine::choose_kind(&hardware);
     let planned = apply_expert(
-        plan(&hardware, kind, profile, weights)?,
+        plan_with_reclaim(&hardware, kind, profile, weights, reclaim)?,
         &settings::expert(app).unwrap_or_default(),
     );
 
@@ -397,19 +456,48 @@ fn load_inner(app: &AppHandle, manager: &RuntimeManager, target: ActiveTarget) -
         .path()
         .app_data_dir()
         .map_err(|e| format!("Non trovo la cartella dati: {e}"))?;
-    let cancel = manager.inner.lock().expect("runtime lock").cancel_load.clone();
 
-    let engine = engine::ensure(&app_data, &hardware, &cancel, |kind, got, total, message| {
-        let mut snap = base_snapshot(&target, kind, false, &planned);
-        snap.received_bytes = got;
-        snap.expected_bytes = total;
-        manager.publish(app, snap.with_phase(RuntimePhase::Motore, message));
-    })?;
+    let mut force = false;
+    let mut last_err = String::new();
+    for attempt in 0..2 {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("Ho fermato l’avvio.".into());
+        }
+        let engine = engine::ensure(&app_data, &hardware, &cancel, force, |kind, got, total, message| {
+            let mut snap = base_snapshot(&target, kind, false, &planned);
+            snap.received_bytes = got;
+            snap.expected_bytes = total;
+            manager.publish(app, snap.with_phase(RuntimePhase::Motore, message));
+        })?;
 
-    if cancel.load(Ordering::Relaxed) {
-        return Err("Ho fermato l’avvio.".into());
+        match launch_server(app, manager, &target, &engine, &planned, &cancel, &app_data) {
+            Ok(snapshot) => return Ok(snapshot),
+            Err(err) if attempt == 0 && needs_newer_engine(&err) => {
+                last_err = err;
+                force = true;
+                manager.publish(
+                    app,
+                    base_snapshot(&target, engine.kind, false, &planned).with_phase(
+                        RuntimePhase::Motore,
+                        "Questo modello serve un llama.cpp più recente. Lo scarico.",
+                    ),
+                );
+            }
+            Err(err) => return Err(explain_load_err(err)),
+        }
     }
+    Err(explain_load_err(last_err))
+}
 
+fn launch_server(
+    app: &AppHandle,
+    manager: &RuntimeManager,
+    target: &ActiveTarget,
+    engine: &engine::EngineSpec,
+    planned: &LaunchPlan,
+    cancel: &std::sync::atomic::AtomicBool,
+    app_data: &Path,
+) -> Result<Snapshot, String> {
     let mut cfg = planned.config.clone();
     let mut last_err = String::new();
     for offset in 0..10u16 {
@@ -419,28 +507,99 @@ fn load_inner(app: &AppHandle, manager: &RuntimeManager, target: ActiveTarget) -
         cfg.port = INTERNAL_PORT + offset;
         manager.publish(
             app,
-            base_snapshot(&target, engine.kind, true, &planned)
-                .with_phase(RuntimePhase::Avvio, "Carico il modello in memoria."),
+            base_snapshot(target, engine.kind, true, planned).with_phase(
+                RuntimePhase::Avvio,
+                format!("Carico {} in memoria · 0s", target.model_name),
+            ),
         );
         match ServerProcess::spawn(&engine.exe, &target.path, &cfg) {
-            Ok(mut server) => match wait_ready(&mut server) {
-                Ok(()) => {
-                    let snapshot = base_snapshot(&target, engine.kind, true, &planned)
-                        .with_phase(RuntimePhase::Pronto, planned.outcome.clone());
-                    let mut inner = manager.inner.lock().expect("runtime lock");
-                    inner.server = Some(server);
-                    inner.context_tokens = planned.config.context;
-                    return Ok(snapshot);
+            Ok(mut server) => {
+                match wait_ready(&mut server, cancel, |elapsed, log| {
+                    let shown = display_log(log);
+                    write_load_log(app_data, &shown);
+                    manager.publish(
+                        app,
+                        base_snapshot(target, engine.kind, true, planned)
+                            .with_phase(
+                                RuntimePhase::Avvio,
+                                format!(
+                                    "Carico {} in memoria · {}",
+                                    target.model_name,
+                                    format_elapsed(elapsed)
+                                ),
+                            )
+                            .with_log(shown),
+                    );
+                }) {
+                    Ok(()) => {
+                        let snapshot = base_snapshot(target, engine.kind, true, planned)
+                            .with_phase(RuntimePhase::Pronto, planned.outcome.clone());
+                        write_load_log(
+                            app_data,
+                            &format!("Pronto.\n{}", display_log(&server.last_error())),
+                        );
+                        let mut inner = manager.inner.lock().expect("runtime lock");
+                        inner.server = Some(server);
+                        inner.context_tokens = planned.config.context;
+                        inner.reserved_ram = planned.ram_bytes;
+                        return Ok(snapshot);
+                    }
+                    Err(err) => {
+                        write_load_log(app_data, &display_log(&server.last_error()));
+                        last_err = format!("{err} · {}", planned.detail);
+                        drop(server);
+                        if !port_in_use(&last_err) {
+                            return Err(last_err);
+                        }
+                    }
                 }
-                Err(err) => {
-                    last_err = format!("{err} · {}", planned.detail);
-                    drop(server);
+            }
+            Err(err) => {
+                last_err = format!("{err} · {}", planned.detail);
+                if !port_in_use(&last_err) {
+                    return Err(last_err);
                 }
-            },
-            Err(err) => last_err = format!("{err} · {}", planned.detail),
+            }
         }
     }
     Err(last_err)
+}
+
+fn wait_ram_reclaim(reclaim: u64, cancel: &AtomicBool) {
+    let baseline = hardware::get_hardware()
+        .memory
+        .available_bytes
+        .unwrap_or(0);
+    let started = Instant::now();
+    while started.elapsed() < Duration::from_secs(2) {
+        if cancel.load(Ordering::Relaxed) {
+            return;
+        }
+        thread::sleep(Duration::from_millis(150));
+        let now = hardware::get_hardware()
+            .memory
+            .available_bytes
+            .unwrap_or(0);
+        if now.saturating_sub(baseline) >= reclaim / 4 {
+            return;
+        }
+    }
+}
+
+fn explain_load_err(err: String) -> String {
+    if needs_newer_engine(&err) {
+        format!(
+            "Questo modello è troppo nuovo per il motore locale. AInside prova ad aggiornare llama.cpp da solo; se resta così, il log sotto dice quale architettura manca.\n\n{err}"
+        )
+    } else {
+        err
+    }
+}
+
+fn write_load_log(app_data: &Path, text: &str) {
+    let dir = app_data.join("runtime");
+    let _ = fs::create_dir_all(&dir);
+    let _ = fs::write(dir.join("last-load.log"), text);
 }
 
 fn base_snapshot(
@@ -458,6 +617,7 @@ fn base_snapshot(
         received_bytes: 0,
         expected_bytes: 0,
         error_detail: None,
+        log: None,
         outcome: Some(plan.outcome.clone()),
         profile_label: Some(plan.profile.label_it().into()),
         profile: Some(plan.profile),

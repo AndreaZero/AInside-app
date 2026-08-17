@@ -9,7 +9,7 @@ import { folderName, sessionKind, type ChatMessage } from "../lib/chat";
 import { cx } from "../lib/cx";
 import { formatDuration, formatTokenRate } from "../lib/format";
 import { pickFolder } from "../lib/pickFolder";
-import { canChat, isBusy } from "../lib/runtime";
+import { canChat, composerPlaceholder } from "../lib/runtime";
 import { visibleAnswer, splitThink } from "../lib/think";
 import {
   flattenFiles,
@@ -41,6 +41,7 @@ import {
 } from "../ui/icons";
 import { MenuItem, Popover, Tooltip, useFeedback } from "../ui/overlays";
 import { EmptyState, ErrorState, InlineAlert } from "../ui/states";
+import { RuntimeLoadLog } from "../layout/RuntimeBanner";
 import { ModelLogo } from "../visuals/ModelLogo";
 import { AssistantMessage, UserBubble } from "./chat/ChatMessage";
 import { CodeMentions } from "./code/CodeMentions";
@@ -80,7 +81,6 @@ export function CodeView({ onNavigate }: CodeViewProps) {
   const [modelOpen, setModelOpen] = useState(false);
   const [permOpen, setPermOpen] = useState(false);
   const [writeStatus, setWriteStatus] = useState<CodingStatus | null>(null);
-  const asked = useRef(false);
   const pendingReply = useRef(false);
   const genStarted = useRef<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
@@ -128,16 +128,6 @@ export function CodeView({ onNavigate }: CodeViewProps) {
     setTurns(session?.messages ?? []);
     runtime.clearReply();
   }, [currentId, session?.messages, runtime.clearReply]);
-
-  useEffect(() => {
-    if (!active || asked.current) return;
-    if (!snapshot || snapshot.phase === "spento") {
-      asked.current = true;
-      void runtime.load().catch(() => {
-        asked.current = false;
-      });
-    }
-  }, [active, snapshot, runtime]);
 
   useEffect(() => {
     if (snapshot?.phase === "inRisposta") {
@@ -755,25 +745,6 @@ export function CodeView({ onNavigate }: CodeViewProps) {
                   >
                     Cambia cartella
                   </MenuItem>
-                  {active && snapshot && snapshot.phase !== "spento" && snapshot.phase !== "errore" ? (
-                    <MenuItem
-                      onSelect={() => {
-                        setMenuOpen(false);
-                        void runtime.unload();
-                      }}
-                    >
-                      Spegni modello
-                    </MenuItem>
-                  ) : active ? (
-                    <MenuItem
-                      onSelect={() => {
-                        setMenuOpen(false);
-                        void runtime.load();
-                      }}
-                    >
-                      Accendi modello
-                    </MenuItem>
-                  ) : null}
                   <MenuItem
                     onSelect={() => {
                       setMenuOpen(false);
@@ -815,9 +786,16 @@ export function CodeView({ onNavigate }: CodeViewProps) {
           {(runtime.error || snapshot?.phase === "errore") && (
             <div style={{ padding: "12px 22px 0" }}>
               <ErrorState
-                title="Impossibile avviare il modello"
+                title="Il modello non è partito"
                 description={runtime.error ?? snapshot?.message ?? "Qualcosa è andato storto."}
                 detail={snapshot?.errorDetail}
+                action={
+                  active ? (
+                    <Button onClick={() => void runtime.load()}>Riprova</Button>
+                  ) : (
+                    <Button onClick={() => onNavigate("models")}>Scegli un modello</Button>
+                  )
+                }
               />
             </div>
           )}
@@ -959,13 +937,12 @@ export function CodeView({ onNavigate }: CodeViewProps) {
                 <span>{formatTokenRate(tokenRate)}</span>
               </div>
             )}
-            {(snapshot?.phase === "avvio" || snapshot?.phase === "motore") && (
-              <div className="chat-status-line">
-                <span>
-                  {snapshot.phase === "motore"
-                    ? "Caricamento modello in memoria…"
-                    : "Avvio modello…"}
-                </span>
+            {(snapshot?.phase === "avvio" ||
+              snapshot?.phase === "motore" ||
+              snapshot?.phase === "errore") && (
+              <div className="chat-status-line chat-status-line--stack">
+                <span>{snapshot.message}</span>
+                <RuntimeLoadLog snapshot={snapshot} />
               </div>
             )}
             {mentions.length > 0 ? (
@@ -987,15 +964,11 @@ export function CodeView({ onNavigate }: CodeViewProps) {
                 rows={1}
                 value={input}
                 disabled={!canChat(snapshot)}
-                placeholder={
-                  canChat(snapshot)
-                    ? "Cosa vuoi fare? @ per un file."
-                    : isBusy(snapshot)
-                      ? "Un momento, sto accendendo il modello…"
-                      : active
-                        ? "Accendi il modello per scrivere."
-                        : "Scegli un modello per scrivere."
-                }
+                placeholder={composerPlaceholder(
+                  snapshot,
+                  Boolean(active),
+                  "Cosa vuoi fare? @ per un file.",
+                )}
                 onChange={(event) => {
                   setInput(event.target.value);
                   resize();

@@ -308,20 +308,36 @@ fn parse_fences(text: &str) -> Vec<RawEdit> {
     let mut i = 0;
     let bytes = text.as_bytes();
     while i < bytes.len() {
+        if !text.is_char_boundary(i) {
+            i += 1;
+            continue;
+        }
         if text[i..].starts_with("```") && (i == 0 || bytes[i - 1] == b'\n') {
             let after = i + 3;
             let rest = &text[after..];
             let nl = rest.find('\n').unwrap_or(rest.len());
             let info = rest[..nl].trim();
             let body_start = after + nl + usize::from(nl < rest.len());
+            if !text.is_char_boundary(body_start) {
+                i += 1;
+                continue;
+            }
             let close = text[body_start..]
                 .find("\n```")
                 .or_else(|| text[body_start..].find("```"));
             let Some(end_rel) = close else {
                 break;
             };
-            let body = &text[body_start..body_start + end_rel];
-            i = body_start + end_rel + 3;
+            let body_end = body_start + end_rel;
+            if !text.is_char_boundary(body_end) {
+                i += 1;
+                continue;
+            }
+            let body = &text[body_start..body_end];
+            i = (body_end + 3).min(text.len());
+            while i < text.len() && !text.is_char_boundary(i) {
+                i += 1;
+            }
             if let Some(rel) = path_from_fence(info) {
                 if !out.iter().any(|item: &RawEdit| item.rel == rel) {
                     out.push(RawEdit {
@@ -390,5 +406,14 @@ mod tests {
     #[test]
     fn skips_email_and_lang() {
         assert!(parse_edits("```python\nprint(1)\n```\n").is_empty());
+    }
+
+    #[test]
+    fn ellipsis_in_prose_does_not_panic() {
+        let text = "Ho letto il file… ecco cosa fa.\n```src/app.ts\nexport const n = 2;\n```\n";
+        let edits = parse_edits(text);
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].rel, "src/app.ts");
+        assert_eq!(strip_edit_blocks(text).contains('…'), true);
     }
 }

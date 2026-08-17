@@ -8,11 +8,12 @@ import { useTokenRate } from "../hooks/useTokenRate";
 import { sessionKind, type ChatMessage } from "../lib/chat";
 import { cx } from "../lib/cx";
 import { formatDuration, formatProgress, formatTokenRate } from "../lib/format";
-import { canChat, isBusy } from "../lib/runtime";
+import { canChat, composerPlaceholder } from "../lib/runtime";
 import type { RouteId } from "../navigation/routes";
 import { Button, StatusBadge } from "../ui/controls";
 import { IconEye, IconMore, IconSend, IconSpark, IconStop } from "../ui/icons";
 import { MenuItem, Popover, Tooltip, useFeedback } from "../ui/overlays";
+import { RuntimeLoadLog } from "../layout/RuntimeBanner";
 import { EmptyState, ErrorState, InlineAlert } from "../ui/states";
 import { EmptyGlyph } from "../visuals/DownloadRig";
 import { ModelLogo } from "../visuals/ModelLogo";
@@ -37,7 +38,6 @@ export function ChatView({ onNavigate }: ChatViewProps) {
       return true;
     }
   });
-  const settingsProfile = settings?.profile ?? "bilanciato";
   const catalog = useCatalog();
   const active = library.items.find(
     (item) => item.variantId === library.active?.variantId && item.active,
@@ -47,7 +47,6 @@ export function ChatView({ onNavigate }: ChatViewProps) {
   const [copied, setCopied] = useState<number | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
-  const asked = useRef(false);
   const pendingReply = useRef(false);
   const genStarted = useRef<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
@@ -70,16 +69,6 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     setTurns(stored?.messages ?? []);
     runtime.clearReply();
   }, [currentId, chats.snapshot, runtime.clearReply]);
-
-  useEffect(() => {
-    if (!active || asked.current) return;
-    if (!snapshot || snapshot.phase === "spento") {
-      asked.current = true;
-      void runtime.load().catch(() => {
-        asked.current = false;
-      });
-    }
-  }, [active, snapshot, runtime]);
 
   useEffect(() => {
     if (snapshot?.phase === "inRisposta") {
@@ -289,25 +278,6 @@ export function ChatView({ onNavigate }: ChatViewProps) {
               align="end"
               content={
                 <>
-                  {active && snapshot && snapshot.phase !== "spento" && snapshot.phase !== "errore" ? (
-                    <MenuItem
-                      onSelect={() => {
-                        setMenuOpen(false);
-                        void runtime.unload();
-                      }}
-                    >
-                      Spegni modello
-                    </MenuItem>
-                  ) : active ? (
-                    <MenuItem
-                      onSelect={() => {
-                        setMenuOpen(false);
-                        void runtime.load();
-                      }}
-                    >
-                      Accendi modello
-                    </MenuItem>
-                  ) : null}
                   <MenuItem
                     onSelect={() => {
                       setMenuOpen(false);
@@ -364,21 +334,19 @@ export function ChatView({ onNavigate }: ChatViewProps) {
           {(runtime.error || snapshot?.phase === "errore") && (
             <div style={{ padding: "12px 22px 0" }}>
               <ErrorState
-                title="Impossibile avviare il modello"
+                title="Il modello non è partito"
                 description={runtime.error ?? snapshot?.message ?? "Qualcosa è andato storto."}
                 detail={snapshot?.errorDetail}
+                action={
+                  active ? (
+                    <Button onClick={() => void runtime.load()}>Riprova</Button>
+                  ) : (
+                    <Button onClick={() => onNavigate("models")}>Scegli un modello</Button>
+                  )
+                }
               />
             </div>
           )}
-          {snapshot?.profile &&
-            snapshot.phase !== "spento" &&
-            snapshot.profile !== settingsProfile && (
-              <div style={{ padding: "12px 22px 0" }}>
-                <InlineAlert>
-                  Hai cambiato il profilo. Spegni e accendi il modello per applicarlo.
-                </InlineAlert>
-              </div>
-            )}
           {chats.error && (
             <div style={{ padding: "12px 22px 0" }}>
               <InlineAlert tone="danger">{chats.error}</InlineAlert>
@@ -388,11 +356,13 @@ export function ChatView({ onNavigate }: ChatViewProps) {
           <div className="chat-log" aria-live="polite">
             {turns.length === 0 && !runtime.reply && snapshot?.phase !== "inRisposta" && (
               <p className="page-note">
-                {snapshot?.outcome ??
-                  snapshot?.message ??
-                  (active
-                    ? "Il modello è locale. Scrivi quando è pronto."
-                    : "Scegli un modello per continuare.")}
+                {snapshot?.phase === "motore" || snapshot?.phase === "avvio"
+                  ? snapshot.message
+                  : snapshot?.outcome ??
+                    snapshot?.message ??
+                    (active
+                      ? "Il modello è locale. Scrivi quando è pronto."
+                      : "Scegli un modello per continuare.")}
                 {downloading
                   ? ` · ${formatProgress(snapshot.receivedBytes, snapshot.expectedBytes)}`
                   : ""}
@@ -442,13 +412,12 @@ export function ChatView({ onNavigate }: ChatViewProps) {
                 <span>{formatTokenRate(tokenRate)}</span>
               </div>
             )}
-            {(snapshot?.phase === "avvio" || snapshot?.phase === "motore") && (
-              <div className="chat-status-line">
-                <span>
-                  {snapshot.phase === "motore"
-                    ? "Caricamento modello in memoria…"
-                    : "Avvio modello…"}
-                </span>
+            {(snapshot?.phase === "avvio" ||
+              snapshot?.phase === "motore" ||
+              snapshot?.phase === "errore") && (
+              <div className="chat-status-line chat-status-line--stack">
+                <span>{snapshot.message}</span>
+                <RuntimeLoadLog snapshot={snapshot} />
               </div>
             )}
             <form
@@ -463,15 +432,7 @@ export function ChatView({ onNavigate }: ChatViewProps) {
                 rows={1}
                 value={input}
                 disabled={!canChat(snapshot)}
-                placeholder={
-                  canChat(snapshot)
-                    ? "Scrivi qui."
-                    : isBusy(snapshot)
-                      ? "Un momento, sto accendendo il modello…"
-                      : active
-                        ? "Accendi il modello per scrivere."
-                        : "Scegli un modello per scrivere."
-                }
+                placeholder={composerPlaceholder(snapshot, Boolean(active), "Scrivi qui.")}
                 onChange={(event) => {
                   setInput(event.target.value);
                   resize();

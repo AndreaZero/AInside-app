@@ -1218,6 +1218,16 @@
   color: var(--text-secondary);
 }
 
+.chat-status-line--stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+
+.chat-status-line--stack .runtime-strip-log {
+  margin: 0;
+}
+
 .chat-composer {
   display: flex;
   align-items: flex-end;
