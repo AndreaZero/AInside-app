@@ -91,49 +91,36 @@ Server locale opzionale `http://localhost:11435`: `GET /v1/models`, `POST /v1/ch
 
 ---
 
-## Fase 5+ — Immagini, ricerca, codice
+## Fase 5 — Modalità Codice
 
-Piano: [`docs/plan-capability.md`](plan-capability.md). Disegno confermato (sidebar Codice, DDG, ricerca a richiesta, write con permessi). **Non implementare** finché non si parte da T13. Poi un task alla volta.
+Piano: [`docs/plan-coding.md`](plan-coding.md). **Non implementare** finché non si parte da T13. Poi un task alla volta. Visione e ricerca web sono in pausa (vedi «Dopo»).
 
-### T13 — Fondazione messaggi e strumenti
-Stato: `todo`
+### T13 — Codice: guscio
+Stato: `done`
 
-`ChatSession.kind` (`chat` | `code`), allegati su disco (`{appData}/chats/{id}/media/`), JSON chat retrocompatibile. Modulo `capability/` agganciato, ancora vuoto di logica. I messaggi vecchi (solo `content`) restano validi.
+Route `code`, tasto sidebar **Codice** (riga, come Nuova chat). Elenco sessioni filtrato per `kind`. Empty «Apri una cartella» con `pickFolder`. `ChatSession.kind` + `workspacePath`, JSON vecchio = chat. Niente lettura file, niente write.
 
-### T14 — Visione: catalogo e download
-Stato: `todo`
+### T14 — Codice: disco in lettura
+Stato: `done`
 
-Su ogni modello `visione`, mmproj verificato (url, size, SHA256). Download accoppiato «modello + visione». Stima spazio/VRAM include il projector.
+Modulo `workspace/`: tree, read, search. Solo sotto la root, ignore `node_modules`/`.git`, cap 64 KB. Albero + anteprima sola lettura + `@` nel composer.
 
-### T15 — Visione: runtime e chat
-Stato: `todo`
+### T15 — Codice: giro agente
+Stato: `done`
 
-`--mmproj` in llama.cpp. In chat: graffetta / drag / incolla se il modello vede. Miniature, persistenza allegati, API locale `image_url`. Senza mmproj: chat testo, niente graffetta.
+Pack context + prompt corto. Marker `LEGGI:` max 4 a messaggio. Stream in CodeView. Stesso llama.cpp della chat. Niente write.
 
-### T16 — Ricerca web
-Stato: `todo`
+### T16 — Codice: scrittura e permessi
+Stato: `done`
 
-DuckDuckGo, zero chiavi. Tre vie: intento utente («cerca su internet»), marker `CERCA:` del modello (max 2 giri), globo per-chat. Link incollato = fetch pagina. Permesso `chiedi` / `sempre` / `mai`. Fonti vere in UI. In Codice, «cerca nel file» non è web.
-
-### T17 — Codice: guscio UI
-Stato: `todo`
-
-Route e voce sidebar **Codice**. Empty «Apri una cartella». Albero (ignora node_modules/.git). Sessione `kind: code` + `workspacePath`. Anteprima file sola lettura. Se `quality.coding < 4`, suggerisci un modello migliore.
-
-### T18 — Codice: lettura e contesto
-Stato: `todo`
-
-Elenca / cerca / leggi sotto la root. Niente `.env` e segreti. Pack nel context senza OOM. System prompt corto da programmatore. Niente write.
-
-### T19 — Codice: scrittura e permessi
-Stato: `todo`
-
-Parse diff / `SCRIVI:`. Permessi `ask` | `session` | `folder` | `always` (revocabili). File-segreto sempre in `ask`. Write atomico sotto la root; toast + Annulla ultima. Con `ask`, carta in attesa; con permanente, applica e lascia traccia in chat.
+Parse blocchi cerca/sostituisci. Permessi `ask` | `session` | `folder` | `always`. Segreti sempre `ask`. Write atomico, toast + Annulla. Carte in chat.
 
 ---
 
 ## Dopo (non toccare ora)
 
+- Visione / mmproj
+- Ricerca web (DuckDuckGo)
 - macOS / Linux first-class
 - Altri backend oltre llama.cpp
 - Catalogo remoto aggiornabile

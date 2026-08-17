@@ -1,6 +1,8 @@
 # Piano: immagini, ricerca, modalità codice
 
-Disegno (solo architettura, niente codice ora). Le tre cose condividono un piano; non sono tre app.
+**Aggiornamento:** Codice ha un piano proprio, più stretto: [`plan-coding.md`](plan-coding.md). **Ricerca e visione sono in pausa** — non si implementano insieme al codice. Questo file resta come contesto; in caso di conflitto vince `plan-coding.md`.
+
+Disegno originario (architettura). Le tre cose condividono un piano; non sono tre app.
 
 Oggi AInside è chat di testo su llama.cpp: un messaggio = una stringa ([`src-tauri/src/chat/types.rs`](src-tauri/src/chat/types.rs), [`src/views/ChatView.tsx`](src/views/ChatView.tsx)). Il catalogo ha già categorie `visione` e `programmazione` e punteggi `quality.coding`, ma nessun file mmproj, nessun allegato, nessuna cartella di lavoro. [`docs/tasks.md`](docs/tasks.md) le metteva in «dopo l’MVP».
 
@@ -268,7 +270,9 @@ Un pezzo alla volta, progetto compilabile, come in [`docs/tasks.md`](docs/tasks.
 | **T18** Codice — lettura | leggi/cerca in cartella, packing, prompt codice |
 | **T19** Codice — scrittura | diff, permessi `ask`/`session`/`folder`/`always`, applica + annulla |
 
-T13 è l’unico obbligatorio prima degli altri. T14–T15 prima di T16 perché restano locali e sbloccano screenshot anche in Codice. T16 prima di T17 perché il composer è ancora uno. T17–T19 sono la modalità che hai chiesto: non spezzarli con altro in mezzo.
+## Ordine di lavoro
+
+Superato. L’ordine attuale è solo Codice: T13–T16 in [`plan-coding.md`](plan-coding.md) e [`tasks.md`](tasks.md). Visione e ricerca non partono da qui.
 
 ---
 
@@ -286,6 +290,6 @@ T13 è l’unico obbligatorio prima degli altri. T14–T15 prima di T16 perché 
 
 ## Stato del disegno
 
-Confermato: sidebar Codice, DuckDuckGo, ricerca quando lo chiedi (tre vie), agente che scrive con permessi anche definitivi.
+Codice: vedi [`plan-coding.md`](plan-coding.md). Ricerca e visione: in pausa.
 
-**Nessun T13+ finché non dici di partire.** Poi solo T13.
+**Nessun codice finché non dici di partire da T13 (guscio Codice).**

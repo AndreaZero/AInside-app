@@ -42,6 +42,6 @@ Toast, dialog, popover, tooltip, skeleton, spinner, progress, empty, error a due
 
 ## Layout
 
-Sidebar persistente: Nuova chat, Chat, Modelli, Download, Impostazioni. Brand → home. In basso widget prestazioni. Chat ha cronologia secondaria. Impostazioni ha nav interna.
+Sidebar persistente: Nuova chat, Codice, cronologia (chat o lavori, in base al posto), Modelli, Download, Impostazioni. Brand → home. In basso widget prestazioni. Impostazioni ha nav interna.
 
 Viewport: 1920, 1440, 1366. Sotto ~1100px la sidebar diventa icon-rail.

@@ -5,7 +5,7 @@ import { useLibrary, useLibrarySnapshot } from "../hooks/useLibrary";
 import { useRuntime } from "../hooks/useRuntime";
 import { useSettings } from "../hooks/useSettings";
 import { useTokenRate } from "../hooks/useTokenRate";
-import type { ChatMessage } from "../lib/chat";
+import { sessionKind, type ChatMessage } from "../lib/chat";
 import { cx } from "../lib/cx";
 import { formatDuration, formatProgress, formatTokenRate } from "../lib/format";
 import { canChat, isBusy } from "../lib/runtime";
@@ -53,7 +53,8 @@ export function ChatView({ onNavigate }: ChatViewProps) {
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
   const area = useRef<HTMLTextAreaElement>(null);
   const snapshot = runtime.snapshot;
-  const currentId = chats.current?.id ?? null;
+  const session = sessionKind(chats.current) === "code" ? null : chats.current;
+  const currentId = session?.id ?? null;
   const model = useMemo(
     () =>
       active
@@ -65,8 +66,8 @@ export function ChatView({ onNavigate }: ChatViewProps) {
 
   useEffect(() => {
     if (pendingReply.current) return;
-    const session = chats.snapshot?.sessions.find((item) => item.id === currentId);
-    setTurns(session?.messages ?? []);
+    const stored = chats.snapshot?.sessions.find((item) => item.id === currentId);
+    setTurns(stored?.messages ?? []);
     runtime.clearReply();
   }, [currentId, chats.snapshot, runtime.clearReply]);
 
@@ -178,7 +179,7 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     el.style.height = `${Math.min(el.scrollHeight, 180)}px`;
   }
 
-  if (!active && turns.length === 0 && !chats.current) {
+  if (!active && turns.length === 0 && !session) {
     return (
       <section className="page page--fill chat-empty">
         <EmptyState
@@ -195,7 +196,7 @@ export function ChatView({ onNavigate }: ChatViewProps) {
     );
   }
 
-  const title = chats.current?.title ?? snapshot?.modelName ?? active?.modelName ?? "Chat";
+  const title = session?.title ?? snapshot?.modelName ?? active?.modelName ?? "Chat";
   const downloading = snapshot?.phase === "motore" && snapshot.expectedBytes > 0;
   const lastAssistant = turns.length > 0 && turns[turns.length - 1]?.role === "assistant";
   const readyModels = library.items.filter((item) => item.status === "pronto");

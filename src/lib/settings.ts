@@ -55,4 +55,24 @@ export type AppSettings = {
   expert?: ExpertSettings;
   api?: ApiSettings;
   thinking?: boolean;
+  coding?: CodingSettings;
+};
+
+export type CodingWrite = "ask" | "always";
+
+export type CodingSettings = {
+  write?: CodingWrite;
+  trustedFolders?: string[];
+  lastWorkspace?: string | null;
+};
+
+export type CodingStatus = {
+  write: CodingWrite;
+  trusted: boolean;
+  session: boolean;
+  canWrite: boolean;
+  canUndo: boolean;
+  label: string;
+  lastWorkspace: string | null;
+  trustedFolders: string[];
 };

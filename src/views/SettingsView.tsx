@@ -22,6 +22,7 @@ import {
   IconCpu,
   IconFolder,
   IconInfo,
+  IconPen,
   IconSettings,
   IconSpark,
 } from "../ui/icons";
@@ -35,6 +36,7 @@ const SECTIONS = [
   { id: "generale", label: "Generale", Icon: IconSettings },
   { id: "prestazioni", label: "Prestazioni", Icon: IconCpu },
   { id: "chat", label: "Chat", Icon: IconChat },
+  { id: "codice", label: "Codice", Icon: IconPen },
   { id: "avanzate", label: "Avanzate", Icon: IconSpark },
   { id: "api", label: "API locale", Icon: IconCode },
   { id: "libreria", label: "Libreria", Icon: IconFolder },
@@ -70,6 +72,8 @@ export function SettingsView({ onNavigate }: SettingsViewProps) {
     changeExpert,
     changeThinking,
     changeApiEnabled,
+    grantCoding,
+    revokeCoding,
   } = useSettings();
   const apiOn = apiStatus?.enabled ?? settings?.api?.enabled ?? false;
   const expert = settings?.expert ?? emptyExpert();
@@ -244,6 +248,77 @@ export function SettingsView({ onNavigate }: SettingsViewProps) {
                 </div>
               </SettingCard>
             </>
+          )}
+
+          {section === "codice" && (
+            <SettingCard
+              kicker={current?.label}
+              title="Scrittura sui file"
+              note="Aprire una cartella è solo lettura. Per scrivere, AInside chiede. Puoi fidarti di una cartella, o di tutte."
+              live={(settings?.coding?.write ?? "ask") === "always"}
+            >
+              <SettingSwitch
+                off="Chiede"
+                on="Può scrivere"
+                checked={(settings?.coding?.write ?? "ask") === "always"}
+                label="Scrivere in ogni cartella aperta"
+                onChange={(enabled) => {
+                  void (async () => {
+                    if (enabled) {
+                      const ok = await feedback.confirm({
+                        title: "Permettere la scrittura ovunque?",
+                        description:
+                          "Il modello potrà modificare i file in ogni cartella che apri in Codice, senza chiedere. I file riservati (.env, chiavi) chiedono comunque.",
+                        confirmLabel: "Permetti",
+                        danger: true,
+                      });
+                      if (!ok) return;
+                      await grantCoding("always");
+                    } else {
+                      await grantCoding("ask");
+                    }
+                  })();
+                }}
+              />
+              <p className="model-desc" style={{ marginTop: 16 }}>
+                Cartelle fidate. Qui può scrivere senza chiedere, tranne i file riservati.
+              </p>
+              {settings?.coding?.trustedFolders && settings.coding.trustedFolders.length > 0 ? (
+                <ul className="path-list">
+                  {settings.coding.trustedFolders.map((root) => (
+                    <li key={root}>
+                      <div>
+                        <div className="holo-row">
+                          <HoloTag tone="lime">Fidata</HoloTag>
+                        </div>
+                        <p className="path-value">{root}</p>
+                      </div>
+                      <Button
+                        variant="danger"
+                        onClick={() => {
+                          void feedback
+                            .confirm({
+                              title: "Togliere questa fiducia?",
+                              description: "Prima di scrivere qui, AInside chiederà di nuovo.",
+                              confirmLabel: "Togli",
+                            })
+                            .then((ok) => {
+                              if (ok) void revokeCoding(root);
+                            });
+                        }}
+                      >
+                        Togli
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="model-desc">
+                  Nessuna cartella fidata. Il permesso si dà da Codice, quando il modello vuole
+                  scrivere.
+                </p>
+              )}
+            </SettingCard>
           )}
 
           {section === "avanzate" && (

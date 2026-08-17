@@ -1,4 +1,4 @@
-import type { ChatSession } from "./chat";
+import { sessionKind, type ChatSession, type SessionKind } from "./chat";
 
 export type ChatGroupId = "oggi" | "ieri" | "prima";
 
@@ -24,6 +24,13 @@ function shiftDay(base: Date, days: number): string {
 
 export function archivedSessions(sessions: ChatSession[]): ChatSession[] {
   return sessions.filter((item) => item.archived);
+}
+
+export function sessionsOfKind(
+  sessions: ChatSession[],
+  kind: SessionKind,
+): ChatSession[] {
+  return sessions.filter((item) => sessionKind(item) === kind);
 }
 
 export function groupSessions(sessions: ChatSession[]): {

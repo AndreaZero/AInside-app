@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   addLibraryRoot,
+  codingGrant,
+  codingRevoke,
   getApiStatus,
   getSettings,
   removeLibraryRoot,
@@ -65,6 +67,19 @@ export function useSettings() {
     setSettings(await getSettings());
   }, []);
 
+  const grantCoding = useCallback(
+    async (level: "session" | "folder" | "always" | "ask", root?: string | null) => {
+      await codingGrant(level, root);
+      setSettings(await getSettings());
+    },
+    [],
+  );
+
+  const revokeCoding = useCallback(async (root?: string | null) => {
+    await codingRevoke(root);
+    setSettings(await getSettings());
+  }, []);
+
   return {
     settings,
     apiStatus,
@@ -76,5 +91,7 @@ export function useSettings() {
     changeExpert,
     changeThinking,
     changeApiEnabled,
+    grantCoding,
+    revokeCoding,
   };
 }

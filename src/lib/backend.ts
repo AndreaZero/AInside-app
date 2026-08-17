@@ -6,7 +6,7 @@ import type { HardwareReport } from "./hardware";
 import type { HardwareProfile } from "./profile";
 import type { ChatMessage, ChatSnapshot } from "./chat";
 import type { ChatTurn, RuntimeSnapshot } from "./runtime";
-import type { ApiStatus, AppSettings, ExpertSettings, PerfProfile } from "./settings";
+import type { ApiStatus, AppSettings, CodingStatus, ExpertSettings, PerfProfile } from "./settings";
 
 export type AppInfo = {
   name: string;
@@ -73,6 +73,21 @@ export async function setThinking(enabled: boolean): Promise<AppSettings> {
   return invoke<AppSettings>("set_thinking", { enabled });
 }
 
+export async function codingStatus(root?: string | null): Promise<CodingStatus> {
+  return invoke<CodingStatus>("coding_status", { root: root ?? null });
+}
+
+export async function codingGrant(
+  level: "session" | "folder" | "always" | "ask",
+  root?: string | null,
+): Promise<CodingStatus> {
+  return invoke<CodingStatus>("coding_grant", { root: root ?? null, level });
+}
+
+export async function codingRevoke(root?: string | null): Promise<CodingStatus> {
+  return invoke<CodingStatus>("coding_revoke", { root: root ?? null });
+}
+
 export async function getApiStatus(): Promise<ApiStatus> {
   return invoke<ApiStatus>("get_api_status");
 }
@@ -136,6 +151,18 @@ export async function startCompletion(messages: ChatTurn[]): Promise<RuntimeSnap
   return invoke<RuntimeSnapshot>("start_completion", { messages });
 }
 
+export async function startCodingTurn(input: {
+  messages: ChatTurn[];
+  workspace: string;
+  cited?: string[];
+}): Promise<RuntimeSnapshot> {
+  return invoke<RuntimeSnapshot>("start_coding_turn", {
+    messages: input.messages,
+    workspace: input.workspace,
+    cited: input.cited ?? [],
+  });
+}
+
 export async function stopCompletion(): Promise<RuntimeSnapshot> {
   return invoke<RuntimeSnapshot>("stop_completion");
 }
@@ -148,12 +175,20 @@ export async function createChat(model?: {
   modelId?: string | null;
   modelName?: string | null;
   variantId?: string | null;
+  kind?: "chat" | "code" | null;
+  workspacePath?: string | null;
 }): Promise<ChatSnapshot> {
   return invoke<ChatSnapshot>("create_chat", {
     modelId: model?.modelId ?? null,
     modelName: model?.modelName ?? null,
     variantId: model?.variantId ?? null,
+    kind: model?.kind ?? null,
+    workspacePath: model?.workspacePath ?? null,
   });
+}
+
+export async function setChatWorkspace(id: string, path: string): Promise<ChatSnapshot> {
+  return invoke<ChatSnapshot>("set_chat_workspace", { id, path });
 }
 
 export async function openChat(id: string): Promise<ChatSnapshot> {

@@ -1,5 +1,6 @@
 //! Adapter llama.cpp: processo ufficiale, niente engine proprietario.
 
+mod coding;
 mod config;
 mod engine;
 mod process;
@@ -42,6 +43,7 @@ struct Inner {
     cancel_load: Arc<AtomicBool>,
     loading: bool,
     generating: bool,
+    context_tokens: u32,
 }
 
 impl Default for Snapshot {
@@ -93,6 +95,7 @@ impl RuntimeManager {
         inner.server = None;
         inner.loading = false;
         inner.generating = false;
+        inner.context_tokens = 0;
         inner.snapshot = Snapshot::spento();
     }
 }
@@ -246,6 +249,97 @@ pub fn start_completion(
 }
 
 #[tauri::command]
+pub fn start_coding_turn(
+    app: AppHandle,
+    manager: State<RuntimeManager>,
+    messages: Vec<ChatTurn>,
+    workspace: String,
+    cited: Option<Vec<String>>,
+) -> Result<RuntimeSnapshot, String> {
+    let current = manager.snapshot();
+    if current.phase != RuntimePhase::Pronto {
+        return Err("Prima accendi il modello.".into());
+    }
+    if workspace.trim().is_empty() {
+        return Err("Apri una cartella del progetto.".into());
+    }
+    {
+        let mut inner = manager.inner.lock().expect("runtime lock");
+        if inner.generating {
+            return Err("Sto già rispondendo.".into());
+        }
+        if inner.server.is_none() {
+            return Err("Il motore non è acceso.".into());
+        }
+        inner.generating = true;
+        inner.stop.store(false, Ordering::Relaxed);
+        inner.snapshot = inner
+            .snapshot
+            .clone()
+            .with_phase(RuntimePhase::InRisposta, "Sto leggendo il progetto.");
+    }
+    let started = manager.snapshot();
+    let _ = app.emit(EVENT, &started);
+
+    let request = coding::CodingTurn {
+        messages,
+        workspace,
+        cited: cited.unwrap_or_default(),
+    };
+    let app2 = app.clone();
+    let mgr = manager.inner().clone();
+    thread::spawn(move || {
+        let (port, stop, context_tokens, model_name) = {
+            let inner = mgr.inner.lock().expect("runtime lock");
+            (
+                inner
+                    .server
+                    .as_ref()
+                    .map(|server| server.port)
+                    .unwrap_or(INTERNAL_PORT),
+                inner.stop.clone(),
+                inner.context_tokens,
+                inner.snapshot.model_name.clone(),
+            )
+        };
+        let expert = settings::expert(&app2).unwrap_or_default();
+        let thinking = settings::thinking_enabled(&app2);
+        let mut sample = stream::SampleConfig::from_expert(&expert, thinking, model_name.as_deref());
+        coding::apply_coding_prompt(&mut sample, model_name.as_deref());
+        let context_tokens = if context_tokens == 0 { 4096 } else { context_tokens };
+        let result = coding::run(
+            port,
+            &request,
+            &stop,
+            &sample,
+            context_tokens,
+            |token| emit_token(&app2, token),
+        );
+        {
+            let mut inner = mgr.inner.lock().expect("runtime lock");
+            inner.generating = false;
+            inner.snapshot = match result {
+                Ok(()) => {
+                    let message = inner
+                        .snapshot
+                        .outcome
+                        .clone()
+                        .unwrap_or_else(|| "Pronto in locale.".into());
+                    inner.snapshot.clone().with_phase(RuntimePhase::Pronto, message)
+                }
+                Err(err) => inner
+                    .snapshot
+                    .clone()
+                    .with_error("La risposta si è interrotta.", err),
+            };
+            let _ = app2.emit(EVENT, &inner.snapshot);
+        }
+    });
+
+    Ok(started)
+}
+
+#[tauri::command]
 pub fn stop_completion(app: AppHandle, manager: State<RuntimeManager>) -> RuntimeSnapshot {
     let mut inner = manager.inner.lock().expect("runtime lock");
     inner.stop.store(true, Ordering::Relaxed);
@@ -333,7 +427,9 @@ fn load_inner(app: &AppHandle, manager: &RuntimeManager, target: ActiveTarget) -
                 Ok(()) => {
                     let snapshot = base_snapshot(&target, engine.kind, true, &planned)
                         .with_phase(RuntimePhase::Pronto, planned.outcome.clone());
-                    manager.inner.lock().expect("runtime lock").server = Some(server);
+                    let mut inner = manager.inner.lock().expect("runtime lock");
+                    inner.server = Some(server);
+                    inner.context_tokens = planned.config.context;
                     return Ok(snapshot);
                 }
                 Err(err) => {

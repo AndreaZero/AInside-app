@@ -138,7 +138,15 @@
 .rail-item.is-new {
   flex-shrink: 0;
   color: var(--text-primary);
-  margin-bottom: 14px;
+  margin-bottom: 0;
+}
+
+.rail-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+  margin: 0 0 14px;
 }
 
 .rail-chats {

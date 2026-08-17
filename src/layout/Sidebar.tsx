@@ -1,11 +1,12 @@
 import { Mark } from "../assets/Mark";
 import { useChats } from "../hooks/useChats";
-import { archivedSessions, groupSessions } from "../lib/chatGroups";
+import { archivedSessions, groupSessions, sessionsOfKind } from "../lib/chatGroups";
 import { cx } from "../lib/cx";
-import type { ChatSession } from "../lib/chat";
+import { sessionKind, type ChatSession } from "../lib/chat";
 import { MENU_ROUTES, ROUTE_LABEL, type RouteId } from "../navigation/routes";
 import {
   IconArchive,
+  IconCode,
   IconDownload,
   IconHome,
   IconModels,
@@ -28,11 +29,20 @@ type SidebarProps = {
   route: RouteId;
   onNavigate: (route: RouteId) => void;
   onNewChat: () => void;
+  onOpenCode: () => void;
+  onNewCode: () => void;
 };
 
-export function Sidebar({ route, onNavigate, onNewChat }: SidebarProps) {
+export function Sidebar({
+  route,
+  onNavigate,
+  onNewChat,
+  onOpenCode,
+  onNewCode,
+}: SidebarProps) {
   const chats = useChats();
-  const sessions = chats.snapshot?.sessions ?? [];
+  const coding = route === "code";
+  const sessions = sessionsOfKind(chats.snapshot?.sessions ?? [], coding ? "code" : "chat");
   const groups = groupSessions(sessions);
   const archived = archivedSessions(sessions);
   const currentId = chats.current?.id;
@@ -64,14 +74,30 @@ export function Sidebar({ route, onNavigate, onNewChat }: SidebarProps) {
         </nav>
       </div>
 
-      <button type="button" className="rail-item is-new" onClick={onNewChat}>
-        <IconPlus />
-        <span>Nuova chat</span>
-      </button>
+      <div className="rail-actions">
+        <button
+          type="button"
+          className="rail-item is-new"
+          onClick={coding ? onNewCode : onNewChat}
+        >
+          <IconPlus />
+          <span>{coding ? "Nuovo lavoro" : "Nuova chat"}</span>
+        </button>
+        <button
+          type="button"
+          className={cx("rail-item", coding && "is-active")}
+          onClick={onOpenCode}
+        >
+          <IconCode />
+          <span>Codice</span>
+        </button>
+      </div>
 
-      <nav className="rail-chats" aria-label="Conversazioni">
+      <nav className="rail-chats" aria-label={coding ? "Lavori sul codice" : "Conversazioni"}>
         {groups.length === 0 && archived.length === 0 ? (
-          <p className="rail-empty">Le chat compariranno qui.</p>
+          <p className="rail-empty">
+            {coding ? "I lavori sul codice compariranno qui." : "Le chat compariranno qui."}
+          </p>
         ) : (
           <>
             {groups.map((group) => (
@@ -81,12 +107,15 @@ export function Sidebar({ route, onNavigate, onNewChat }: SidebarProps) {
                   <ChatRow
                     key={session.id}
                     session={session}
-                    active={session.id === currentId && route === "chat"}
+                    active={session.id === currentId && (coding || route === "chat")}
                     onOpen={() => {
-                      void chats.open(session.id).then(() => onNavigate("chat"));
+                      void chats.open(session.id).then(() => {
+                        onNavigate(sessionKind(session) === "code" ? "code" : "chat");
+                      });
                     }}
                     onArchive={() => void chats.archive(session.id, true)}
                     onRemove={() => void chats.remove(session.id)}
+                    coding={coding}
                   />
                 ))}
               </div>
@@ -98,13 +127,16 @@ export function Sidebar({ route, onNavigate, onNewChat }: SidebarProps) {
                   <ChatRow
                     key={session.id}
                     session={session}
-                    active={session.id === currentId && route === "chat"}
+                    active={session.id === currentId && (coding || route === "chat")}
                     archived
                     onOpen={() => {
-                      void chats.open(session.id).then(() => onNavigate("chat"));
+                      void chats.open(session.id).then(() => {
+                        onNavigate(sessionKind(session) === "code" ? "code" : "chat");
+                      });
                     }}
                     onArchive={() => void chats.archive(session.id, false)}
                     onRemove={() => void chats.remove(session.id)}
+                    coding={coding}
                   />
                 ))}
               </div>
@@ -130,6 +162,7 @@ function ChatRow({
   onOpen,
   onArchive,
   onRemove,
+  coding,
 }: {
   session: ChatSession;
   active: boolean;
@@ -137,6 +170,7 @@ function ChatRow({
   onOpen: () => void;
   onArchive: () => void;
   onRemove: () => void;
+  coding: boolean;
 }) {
   const feedback = useFeedback();
 
@@ -168,8 +202,10 @@ function ChatRow({
               event.stopPropagation();
               void feedback
                 .confirm({
-                  title: "Eliminare questa chat?",
-                  description: "La conversazione sparisce da AInside. I modelli restano sul disco.",
+                  title: coding ? "Eliminare questo lavoro?" : "Eliminare questa chat?",
+                  description: coding
+                    ? "La conversazione sparisce da AInside. I file del progetto restano sul disco."
+                    : "La conversazione sparisce da AInside. I modelli restano sul disco.",
                   confirmLabel: "Elimina",
                   danger: true,
                 })

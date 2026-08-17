@@ -14,34 +14,37 @@ import {
   listChats,
   openChat,
   saveChatMessages,
+  setChatWorkspace,
 } from "../lib/backend";
 import {
   currentSession,
   type ChatMessage,
   type ChatSession,
   type ChatSnapshot,
+  type SessionKind,
 } from "../lib/chat";
+
+type SessionModel = {
+  modelId?: string | null;
+  modelName?: string | null;
+  variantId?: string | null;
+};
+
+type CreateSession = SessionModel & {
+  kind?: SessionKind;
+  workspacePath?: string | null;
+};
 
 type ChatApi = {
   snapshot: ChatSnapshot | null;
   current: ChatSession | null;
   error: string | null;
-  create: (model?: {
-    modelId?: string | null;
-    modelName?: string | null;
-    variantId?: string | null;
-  }) => Promise<void>;
+  create: (model?: CreateSession) => Promise<void>;
   open: (id: string) => Promise<void>;
   remove: (id: string) => Promise<void>;
   archive: (id: string, archived?: boolean) => Promise<void>;
-  save: (
-    messages: ChatMessage[],
-    model?: {
-      modelId?: string | null;
-      modelName?: string | null;
-      variantId?: string | null;
-    },
-  ) => Promise<void>;
+  save: (messages: ChatMessage[], model?: SessionModel) => Promise<void>;
+  setWorkspace: (id: string, path: string) => Promise<void>;
 };
 
 const ChatContext = createContext<ChatApi | null>(null);
@@ -61,21 +64,14 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       });
   }, []);
 
-  const create = useCallback(
-    async (model?: {
-      modelId?: string | null;
-      modelName?: string | null;
-      variantId?: string | null;
-    }) => {
-      try {
-        setSnapshot(await createChat(model));
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Non apro una chat nuova.");
-      }
-    },
-    [],
-  );
+  const create = useCallback(async (model?: CreateSession) => {
+    try {
+      setSnapshot(await createChat(model));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Non apro una chat nuova.");
+    }
+  }, []);
 
   const open = useCallback(async (id: string) => {
     try {
@@ -105,14 +101,7 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const save = useCallback(
-    async (
-      messages: ChatMessage[],
-      model?: {
-        modelId?: string | null;
-        modelName?: string | null;
-        variantId?: string | null;
-      },
-    ) => {
+    async (messages: ChatMessage[], model?: SessionModel) => {
       try {
         setSnapshot(await saveChatMessages(snapshot?.currentId ?? null, messages, model));
         setError(null);
@@ -122,6 +111,15 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     },
     [snapshot?.currentId],
   );
+
+  const setWorkspace = useCallback(async (id: string, path: string) => {
+    try {
+      setSnapshot(await setChatWorkspace(id, path));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Non apro questa cartella.");
+    }
+  }, []);
 
   const value = useMemo<ChatApi>(
     () => ({
@@ -133,8 +131,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       remove,
       archive,
       save,
+      setWorkspace,
     }),
-    [snapshot, error, create, open, remove, archive, save],
+    [snapshot, error, create, open, remove, archive, save, setWorkspace],
   );
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

@@ -34,6 +34,7 @@ pub struct SampleConfig {
     pub seed: Option<i64>,
     pub system_prompt: String,
     pub thinking: bool,
+    pub max_tokens: u32,
 }
 
 impl SampleConfig {
@@ -60,6 +61,7 @@ impl SampleConfig {
                 .map(|text| text.to_string())
                 .unwrap_or_else(|| default_system(model_name, thinking)),
             thinking,
+            max_tokens: if thinking { 2048 } else { 1024 },
         }
     }
 
@@ -73,6 +75,7 @@ impl SampleConfig {
             seed: None,
             system_prompt: default_system(model_name, thinking),
             thinking,
+            max_tokens: if thinking { 2048 } else { 1024 },
         }
     }
 }
@@ -104,7 +107,7 @@ pub fn complete(
         "model": "AInside",
         "stream": true,
         "temperature": sample.temperature,
-        "max_tokens": if sample.thinking { 2048 } else { 1024 },
+        "max_tokens": sample.max_tokens,
         "messages": messages,
     });
     apply_thinking(&mut body, sample.thinking);

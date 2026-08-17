@@ -39,6 +39,27 @@ pub struct AppSettings {
     pub api: ApiSettings,
     #[serde(default)]
     pub thinking: bool,
+    #[serde(default)]
+    pub coding: CodingSettings,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum CodingWrite {
+    #[default]
+    Ask,
+    Always,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CodingSettings {
+    #[serde(default)]
+    pub write: CodingWrite,
+    #[serde(default)]
+    pub trusted_folders: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_workspace: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -129,6 +150,7 @@ fn load_or_default(app: &AppHandle) -> Result<AppSettings, String> {
         expert: ExpertSettings::default(),
         api: ApiSettings::default(),
         thinking: false,
+        coding: CodingSettings::default(),
     })
 }
 
@@ -211,6 +233,81 @@ pub fn set_thinking(app: AppHandle, enabled: bool) -> Result<AppSettings, String
     let mut settings = current(&app)?;
     settings.thinking = enabled;
     save(&app, &settings)?;
+    Ok(settings)
+}
+
+pub fn touch_workspace(app: &AppHandle, path: &str) -> Result<(), String> {
+    let root = normalize_root(path);
+    if root.is_empty() {
+        return Ok(());
+    }
+    let mut settings = current(app)?;
+    if settings
+        .coding
+        .last_workspace
+        .as_deref()
+        .is_some_and(|old| same_folder(old, &root))
+    {
+        return Ok(());
+    }
+    settings.coding.last_workspace = Some(root);
+    save(app, &settings)
+}
+
+pub fn same_folder(a: &str, b: &str) -> bool {
+    let left = normalize_root(a);
+    let right = normalize_root(b);
+    #[cfg(windows)]
+    {
+        left.eq_ignore_ascii_case(&right)
+    }
+    #[cfg(not(windows))]
+    {
+        left == right
+    }
+}
+
+pub fn folder_trusted(settings: &AppSettings, root: &str) -> bool {
+    settings
+        .coding
+        .trusted_folders
+        .iter()
+        .any(|item| same_folder(item, root))
+}
+
+pub fn set_coding_write(app: &AppHandle, write: CodingWrite) -> Result<AppSettings, String> {
+    let mut settings = current(app)?;
+    settings.coding.write = write;
+    save(app, &settings)?;
+    Ok(settings)
+}
+
+pub fn trust_folder(app: &AppHandle, root: &str) -> Result<AppSettings, String> {
+    let root = normalize_root(root);
+    if root.is_empty() {
+        return Err("Scegli una cartella del progetto.".into());
+    }
+    let mut settings = current(app)?;
+    if !settings
+        .coding
+        .trusted_folders
+        .iter()
+        .any(|item| same_folder(item, &root))
+    {
+        settings.coding.trusted_folders.push(root.clone());
+    }
+    settings.coding.last_workspace = Some(root);
+    save(app, &settings)?;
+    Ok(settings)
+}
+
+pub fn untrust_folder(app: &AppHandle, root: &str) -> Result<AppSettings, String> {
+    let mut settings = current(app)?;
+    settings
+        .coding
+        .trusted_folders
+        .retain(|item| !same_folder(item, root));
+    save(app, &settings)?;
     Ok(settings)
 }
 

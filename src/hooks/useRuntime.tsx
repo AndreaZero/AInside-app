@@ -11,6 +11,7 @@ import { listen } from "@tauri-apps/api/event";
 import {
   getRuntime,
   loadRuntime,
+  startCodingTurn,
   startCompletion,
   stopCompletion,
   unloadRuntime,
@@ -24,6 +25,11 @@ type RuntimeApi = {
   load: () => Promise<void>;
   unload: () => Promise<void>;
   send: (messages: ChatTurn[]) => Promise<void>;
+  sendCoding: (input: {
+    messages: ChatTurn[];
+    workspace: string;
+    cited?: string[];
+  }) => Promise<void>;
   stop: () => Promise<void>;
   clearReply: () => void;
 };
@@ -99,6 +105,21 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const sendCoding = useCallback(
+    async (input: { messages: ChatTurn[]; workspace: string; cited?: string[] }) => {
+      try {
+        setReply("");
+        setSnapshot(await startCodingTurn(input));
+        setError(null);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Non parto la risposta.";
+        setError(message);
+        throw new Error(message);
+      }
+    },
+    [],
+  );
+
   const stop = useCallback(async () => {
     try {
       setSnapshot(await stopCompletion());
@@ -110,8 +131,8 @@ export function RuntimeProvider({ children }: { children: ReactNode }) {
   const clearReply = useCallback(() => setReply(""), []);
 
   const value = useMemo<RuntimeApi>(
-    () => ({ snapshot, reply, error, load, unload, send, stop, clearReply }),
-    [snapshot, reply, error, load, unload, send, stop, clearReply],
+    () => ({ snapshot, reply, error, load, unload, send, sendCoding, stop, clearReply }),
+    [snapshot, reply, error, load, unload, send, sendCoding, stop, clearReply],
   );
 
   return <RuntimeContext.Provider value={value}>{children}</RuntimeContext.Provider>;

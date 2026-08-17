@@ -2,15 +2,15 @@
 
 mod types;
 
-pub use types::{ChatMessage, ChatSession, ChatSnapshot};
+pub use types::{ChatMessage, ChatSession, ChatSnapshot, SessionKind};
 
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use tauri::{AppHandle, Manager};
 
-use types::{title_from, ChatStore};
+use types::{folder_title, title_from, ChatStore};
 
 fn store_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app
@@ -53,15 +53,42 @@ fn sort_sessions(store: &mut ChatStore) {
         .sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
 }
 
-fn empty_session(model_id: Option<String>, model_name: Option<String>, variant_id: Option<String>) -> ChatSession {
+fn normalize_workspace(path: Option<String>) -> Result<Option<String>, String> {
+    let Some(raw) = path.map(|text| text.trim().to_string()).filter(|text| !text.is_empty()) else {
+        return Ok(None);
+    };
+    let resolved = Path::new(&raw);
+    if !resolved.is_dir() {
+        return Err("Questa cartella non c’è più.".into());
+    }
+    Ok(Some(raw))
+}
+
+fn empty_session(
+    model_id: Option<String>,
+    model_name: Option<String>,
+    variant_id: Option<String>,
+    kind: SessionKind,
+    workspace_path: Option<String>,
+) -> ChatSession {
+    let title = match kind {
+        SessionKind::Code => workspace_path
+            .as_deref()
+            .map(folder_title)
+            .filter(|name| !name.is_empty())
+            .unwrap_or_else(|| "Nuovo lavoro".into()),
+        SessionKind::Chat => "Nuova chat".into(),
+    };
     ChatSession {
         id: new_id(),
-        title: "Nuova chat".into(),
+        title,
         updated_at: now_stamp(),
         model_id,
         model_name,
         variant_id,
         archived: false,
+        kind,
+        workspace_path,
         messages: Vec::new(),
     }
 }
@@ -79,12 +106,22 @@ pub fn create_chat(
     model_id: Option<String>,
     model_name: Option<String>,
     variant_id: Option<String>,
+    kind: Option<SessionKind>,
+    workspace_path: Option<String>,
 ) -> Result<ChatSnapshot, String> {
     let mut store = load(&app)?;
-    let session = empty_session(model_id, model_name, variant_id);
+    let kind = kind.unwrap_or(SessionKind::Chat);
+    let workspace_path = match kind {
+        SessionKind::Code => normalize_workspace(workspace_path)?,
+        SessionKind::Chat => None,
+    };
+    let session = empty_session(model_id, model_name, variant_id, kind, workspace_path.clone());
     store.current_id = Some(session.id.clone());
     store.sessions.insert(0, session);
     save(&app, &store)?;
+    if let Some(path) = workspace_path.as_deref() {
+        let _ = crate::settings::touch_workspace(&app, path);
+    }
     Ok(store.snapshot())
 }
 
@@ -124,6 +161,34 @@ pub fn archive_chat(app: AppHandle, id: String, archived: bool) -> Result<ChatSn
 }
 
 #[tauri::command]
+pub fn set_chat_workspace(
+    app: AppHandle,
+    id: String,
+    path: String,
+) -> Result<ChatSnapshot, String> {
+    let workspace = normalize_workspace(Some(path))?
+        .ok_or_else(|| "Scegli una cartella del computer.".to_string())?;
+    let mut store = load(&app)?;
+    let Some(session) = store.sessions.iter_mut().find(|item| item.id == id) else {
+        return Err("Questa conversazione non c’è più.".into());
+    };
+    if session.kind != SessionKind::Code {
+        return Err("Apri una cartella dalla modalità Codice.".into());
+    }
+    let rename = session.messages.is_empty();
+    session.workspace_path = Some(workspace.clone());
+    if rename {
+        session.title = folder_title(&workspace);
+    }
+    session.updated_at = now_stamp();
+    store.current_id = Some(id);
+    save(&app, &store)?;
+    sort_sessions(&mut store);
+    let _ = crate::settings::touch_workspace(&app, &workspace);
+    Ok(store.snapshot())
+}
+
+#[tauri::command]
 pub fn save_chat_messages(
     app: AppHandle,
     id: Option<String>,
@@ -157,7 +222,13 @@ pub fn save_chat_messages(
         }
     }
 
-    let mut session = empty_session(model_id, model_name, variant_id);
+    let mut session = empty_session(
+        model_id,
+        model_name,
+        variant_id,
+        SessionKind::Chat,
+        None,
+    );
     session.messages = messages;
     if let Some(title) = first_user {
         session.title = title;

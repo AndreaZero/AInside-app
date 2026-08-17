@@ -11,6 +11,7 @@ mod hardware;
 mod library;
 mod runtime;
 mod settings;
+mod workspace;
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +36,7 @@ pub fn run() {
         .manage(download::DownloadManager::default())
         .manage(runtime::RuntimeManager::default())
         .manage(api::ApiHub::default())
+        .manage(workspace::WorkspaceHub::default())
         .setup(|app| {
             if settings::current(app.handle())
                 .map(|current| current.api.enabled)
@@ -71,13 +73,24 @@ pub fn run() {
             runtime::load_runtime,
             runtime::unload_runtime,
             runtime::start_completion,
+            runtime::start_coding_turn,
             runtime::stop_completion,
             chat::list_chats,
             chat::create_chat,
             chat::open_chat,
             chat::delete_chat,
             chat::archive_chat,
-            chat::save_chat_messages
+            chat::save_chat_messages,
+            chat::set_chat_workspace,
+            workspace::workspace_tree,
+            workspace::workspace_read,
+            workspace::workspace_search,
+            workspace::write::workspace_preview,
+            workspace::write::workspace_apply,
+            workspace::write::workspace_undo,
+            workspace::write::coding_status,
+            workspace::write::coding_grant,
+            workspace::write::coding_revoke,
         ])
         .build(tauri::generate_context!())
         .expect("error while building AInside")

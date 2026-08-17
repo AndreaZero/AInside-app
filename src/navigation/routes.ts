@@ -2,6 +2,7 @@ export const ROUTES = [
   "machine",
   "models",
   "chat",
+  "code",
   "downloads",
   "settings",
 ] as const;
@@ -12,6 +13,7 @@ export const ROUTE_LABEL: Record<RouteId, string> = {
   machine: "Home",
   models: "Modelli",
   chat: "Chat",
+  code: "Codice",
   downloads: "Download",
   settings: "Impostazioni",
 };
