@@ -12,6 +12,7 @@ import { pickFolder } from "../lib/pickFolder";
 import type { RouteId } from "../navigation/routes";
 import { ChatView } from "../views/ChatView";
 import { CodeView } from "../views/CodeView";
+import { DebugView } from "../views/DebugView";
 import { DownloadsView } from "../views/DownloadsView";
 import { MachineView } from "../views/MachineView";
 import { ModelsView } from "../views/ModelsView";
@@ -162,7 +163,7 @@ function AppFrame() {
         onNewCode={() => void openNewCode()}
       />
       <main className="stage">
-        <RuntimeBanner />
+        <RuntimeBanner onNavigate={setRoute} />
         <div className="stage-page" key={route}>
           {route === "machine" && <MachineView onNavigate={setRoute} />}
           {route === "models" && <ModelsView onNavigate={setRoute} />}
@@ -170,6 +171,7 @@ function AppFrame() {
           {route === "code" && <CodeView onNavigate={setRoute} />}
           {route === "downloads" && <DownloadsView onNavigate={setRoute} />}
           {route === "settings" && <SettingsView onNavigate={setRoute} />}
+          {route === "debug" && <DebugView onNavigate={setRoute} />}
         </div>
       </main>
     </div>
