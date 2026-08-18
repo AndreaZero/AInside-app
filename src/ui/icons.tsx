@@ -310,3 +310,30 @@ export function IconWindow(props: IconProps) {
     </Svg>
   );
 }
+
+export function IconPanelBottom(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="4" y="5" width="16" height="14" rx="2" />
+      <path d="M4 14.5h16" />
+    </Svg>
+  );
+}
+
+export function IconPanelSide(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="4" y="5" width="16" height="14" rx="2" />
+      <path d="M14.5 5v14" />
+    </Svg>
+  );
+}
+
+export function IconPanelFloat(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3.5" y="7" width="13" height="11" rx="1.5" />
+      <rect x="7.5" y="4.5" width="13" height="11" rx="1.5" />
+    </Svg>
+  );
+}

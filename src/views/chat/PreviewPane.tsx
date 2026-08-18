@@ -10,13 +10,14 @@ import {
 } from "react";
 import { cx } from "../../lib/cx";
 import { Button } from "../../ui/controls";
-import { IconClose, IconWindow } from "../../ui/icons";
+import { IconClose, IconRefresh, IconWindow } from "../../ui/icons";
 import { Tooltip } from "../../ui/overlays";
 import { WebPreview } from "./WebPreview";
 
 type PreviewApi = {
   open: boolean;
   doc: string | null;
+  url: string | null;
   live: boolean;
   show: (doc?: string) => void;
   hide: () => void;
@@ -49,24 +50,29 @@ export function PreviewToggle() {
 
 export function PreviewHost({
   doc,
+  url = null,
   live = false,
   resetKey,
   children,
 }: {
   doc: string | null;
+  url?: string | null;
   live?: boolean;
   resetKey?: string | null;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const [override, setOverride] = useState<string | null>(null);
+  const [frameKey, setFrameKey] = useState(0);
   const dismissed = useRef(false);
   const skipUntilChange = useRef(false);
   const wasLive = useRef(false);
   const prevDoc = useRef<string | null>(doc);
   const docRef = useRef(doc);
   docRef.current = doc;
-  const shown = override ?? doc;
+  const html = override ?? doc;
+  const shown = url ?? html;
+  const livePage = Boolean(url) || live;
 
   useEffect(() => {
     dismissed.current = false;
@@ -77,16 +83,23 @@ export function PreviewHost({
   }, [resetKey]);
 
   useEffect(() => {
-    if (live && !wasLive.current) {
+    if (livePage && !wasLive.current) {
       dismissed.current = false;
       skipUntilChange.current = true;
     }
-    wasLive.current = live;
-  }, [live]);
+    wasLive.current = livePage;
+  }, [livePage]);
 
   useEffect(() => {
     setOverride(null);
   }, [doc]);
+
+  useEffect(() => {
+    if (!url) return;
+    dismissed.current = false;
+    skipUntilChange.current = false;
+    setOpen(true);
+  }, [url]);
 
   useEffect(() => {
     if (!shown) return;
@@ -123,8 +136,8 @@ export function PreviewHost({
   }, []);
 
   const api = useMemo<PreviewApi>(
-    () => ({ open, doc: shown, live, show, hide, toggle }),
-    [open, shown, live, show, hide, toggle],
+    () => ({ open, doc: html, url, live: livePage, show, hide, toggle }),
+    [open, html, url, livePage, show, hide, toggle],
   );
 
   const visible = open || Boolean(shown);
@@ -141,17 +154,31 @@ export function PreviewHost({
             {open ? (
               <>
                 <header className="preview-dock-head">
-                  <span className={cx("web-preview-dot", live && "is-live")} />
+                  <span className={cx("web-preview-dot", livePage && "is-live")} />
                   <span className="preview-dock-title">
-                    {live ? "Anteprima in diretta" : "Anteprima"}
+                    {url ? "Pagina locale" : livePage ? "Anteprima in diretta" : "Anteprima"}
                   </span>
+                  {url ? (
+                    <span className="preview-dock-url" title={url}>
+                      {url.replace(/^https?:\/\//, "")}
+                    </span>
+                  ) : null}
+                  {url ? (
+                    <Button
+                      variant="icon"
+                      aria-label="Ricarica la pagina"
+                      onClick={() => setFrameKey((n) => n + 1)}
+                    >
+                      <IconRefresh size={14} />
+                    </Button>
+                  ) : null}
                   <Button variant="icon" aria-label="Chiudi anteprima" onClick={hide}>
                     <IconClose size={14} />
                   </Button>
                 </header>
                 {shown ? (
                   <div className="preview-dock-body">
-                    <WebPreview doc={shown} />
+                    <WebPreview doc={url ? null : html} url={url} frameKey={frameKey} />
                   </div>
                 ) : (
                   <p className="preview-dock-empty">Nessuna pagina da mostrare.</p>

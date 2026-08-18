@@ -117,6 +117,32 @@ Parse blocchi cerca/sostituisci. Permessi `ask` | `session` | `folder` | `always
 
 ---
 
+## Fase 6 — Codice: girare il progetto
+
+Non è un IDE. Terminale nella cartella aperta, stessi permessi della scrittura. L’utente (poi il modello, con conferma) dice cosa fare; l’app lancia, mostra il log, offre Stop.
+
+### T17 — Codice: guscio terminale
+Stato: `done`
+
+Pannello in basso in CodeView, apribile/chiudibile. Copia italiana, cartella visibile. Nessun processo, nessun comando Rust.
+
+### T18 — Codice: comandi nella cartella
+Stato: `done`
+
+Rust lancia un comando **nella root** del lavoro, stream stdout/stderr, Stop. Permesso come la scrittura (`ask` / sessione / cartella). Input nel pannello. Niente PATH da esperto in UI: errori chiari in italiano.
+
+### T19 — Codice: Installa e Avvia
+Stato: `todo`
+
+Se c’è `package.json`, tasti **Installa** e **Avvia** (script `dev` / `start`). Trova `node`/`npm` sul PC. Processo lungo + Stop. Niente gergo npm in vista normale.
+
+### T20 — Codice: proponi comando
+Stato: `todo`
+
+Il modello può proporre una riga `ESEGUI: …`. Carta di conferma, poi lo stesso runner di T18. Il modello non lancia da solo.
+
+---
+
 ## Dopo (non toccare ora)
 
 - Visione / mmproj
@@ -125,4 +151,5 @@ Parse blocchi cerca/sostituisci. Permessi `ask` | `session` | `folder` | `always
 - Altri backend oltre llama.cpp
 - Catalogo remoto aggiornabile
 - Generazione immagini
-- Terminale / git in modalità codice (stesso schema permessi)
+- Git in modalità codice (stesso schema permessi)
+- LSP / editor con tab

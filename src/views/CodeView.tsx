@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
 import { useCatalog } from "../hooks/useCatalog";
 import { useChats } from "../hooks/useChats";
 import { useLibrary, useLibrarySnapshot } from "../hooks/useLibrary";
 import { useRuntime } from "../hooks/useRuntime";
 import { useSettings } from "../hooks/useSettings";
 import { useStickToBottom } from "../hooks/useStickToBottom";
+import { useTerm } from "../hooks/useTerm";
 import { useTokenRate } from "../hooks/useTokenRate";
 import { folderName, sessionKind, type ChatMessage } from "../lib/chat";
 import { cx } from "../lib/cx";
@@ -18,6 +19,7 @@ import {
   fileLabel,
   mentionAt,
   stripEditBlocks,
+  agentChatText,
   workspaceApply,
   workspacePreview,
   workspaceRead,
@@ -33,10 +35,9 @@ import { codingGrant, codingRevoke, codingStatus } from "../lib/backend";
 import type { CodingStatus } from "../lib/settings";
 import type { RouteId } from "../navigation/routes";
 import { Button, StatusBadge } from "../ui/controls";
-import { IconFolder, IconSend, IconStop } from "../ui/icons";
+import { IconFolder, IconSend, IconStop, IconTerminal } from "../ui/icons";
 import { MenuItem, Popover, Tooltip, useFeedback } from "../ui/overlays";
 import { EmptyState, ErrorState, InlineAlert } from "../ui/states";
-import { RuntimeLoadLog } from "../layout/RuntimeBanner";
 import { ModelLogo } from "../visuals/ModelLogo";
 import { AssistantMessage, UserBubble } from "./chat/ChatMessage";
 import { ComposerThinkTools } from "./chat/ComposerThinkTools";
@@ -44,17 +45,47 @@ import { PreviewHost, PreviewToggle } from "./chat/PreviewPane";
 import { CodeMentions } from "./code/CodeMentions";
 import { CodePatchCard } from "./code/CodePatchCard";
 import { CodePreview } from "./code/CodePreview";
+import { CodeTerminal, type TermDock } from "./code/CodeTerminal";
 import { CodeTree } from "./code/CodeTree";
 
 type CodeViewProps = {
   onNavigate: (route: RouteId) => void;
 };
 
+const TERM_LAYOUT_KEY = "ainside.code.termLayout";
+const TERM_DEFAULTS: Record<TermDock, number> = {
+  bottom: 240,
+  side: 380,
+  float: 420,
+};
+
+function loadTermLayout(): { dock: TermDock; size: Record<TermDock, number> } {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(TERM_LAYOUT_KEY) ?? "") as {
+      dock?: string;
+      size?: Partial<Record<TermDock, number>>;
+    };
+    const dock: TermDock =
+      parsed.dock === "side" || parsed.dock === "float" ? parsed.dock : "bottom";
+    return {
+      dock,
+      size: {
+        bottom: Number(parsed.size?.bottom) || TERM_DEFAULTS.bottom,
+        side: Number(parsed.size?.side) || TERM_DEFAULTS.side,
+        float: Number(parsed.size?.float) || TERM_DEFAULTS.float,
+      },
+    };
+  } catch {
+    return { dock: "bottom", size: { ...TERM_DEFAULTS } };
+  }
+}
+
 export function CodeView({ onNavigate }: CodeViewProps) {
   const library = useLibrarySnapshot();
   const libraryApi = useLibrary();
   const runtime = useRuntime();
   const chats = useChats();
+  const term = useTerm();
   const feedback = useFeedback();
   const { settings, changeThinking } = useSettings();
   const thinkingOn = Boolean(settings?.thinking);
@@ -76,7 +107,16 @@ export function CodeView({ onNavigate }: CodeViewProps) {
   const [copied, setCopied] = useState<number | null>(null);
   const [modelOpen, setModelOpen] = useState(false);
   const [permOpen, setPermOpen] = useState(false);
+  const [termOpen, setTermOpen] = useState(() => {
+    try {
+      return localStorage.getItem("ainside.code.termOpen") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const [termLayout, setTermLayout] = useState(loadTermLayout);
   const [writeStatus, setWriteStatus] = useState<CodingStatus | null>(null);
+  const [livePatches, setLivePatches] = useState<CodePatch[]>([]);
   const pendingReply = useRef(false);
   const genStarted = useRef<number | null>(null);
   const [elapsedMs, setElapsedMs] = useState<number | null>(null);
@@ -157,6 +197,22 @@ export function CodeView({ onNavigate }: CodeViewProps) {
   }, [snapshot?.phase, runtime.reply, runtime.clearReply]);
 
   useEffect(() => {
+    if (snapshot?.phase !== "inRisposta" || !workspace) {
+      return;
+    }
+    const reply = runtime.reply;
+    if (!/\*\*\*\s*File:/i.test(reply) && !/```/.test(reply)) {
+      return;
+    }
+    const handle = window.setTimeout(() => {
+      void workspacePreview(workspace, reply)
+        .then((files) => setLivePatches(files))
+        .catch(() => setLivePatches([]));
+    }, 800);
+    return () => window.clearTimeout(handle);
+  }, [snapshot?.phase, workspace, runtime.reply]);
+
+  useEffect(() => {
     if (!workspace) {
       setTree(null);
       setPreview(null);
@@ -227,14 +283,25 @@ export function CodeView({ onNavigate }: CodeViewProps) {
   function displayContent(text: string, patches?: CodePatch[] | null): string {
     if (!patches?.length) return text;
     const split = splitThink(text);
-    const stripped = stripEditBlocks(visibleAnswer(text));
+    const stripped = agentChatText(visibleAnswer(text));
     if (split.thinking) {
       return `<think>${split.thinking}</think>\n${stripped}`;
     }
     return stripped;
   }
 
+  function displayStreaming(text: string): string {
+    const split = splitThink(text);
+    const stripped = agentChatText(visibleAnswer(text));
+    const body = stripped || "Sto preparando le modifiche — i file non sono ancora toccati.";
+    if (split.thinking) {
+      return `<think>${split.thinking}</think>\n${body}`;
+    }
+    return body;
+  }
+
   async function settleReply(reply: string, durationMs?: number) {
+    setLivePatches([]);
     const root = workspaceRef.current;
     let patches: CodePatch[] | undefined;
     if (root) {
@@ -396,6 +463,7 @@ export function CodeView({ onNavigate }: CodeViewProps) {
     setMentions([]);
     setPreview(null);
     setPreviewError(null);
+    setLivePatches([]);
     await runtime.sendCoding({
       messages: next.map((turn) => ({ role: turn.role, content: turn.content })),
       workspace,
@@ -455,6 +523,82 @@ export function CodeView({ onNavigate }: CodeViewProps) {
       }
       return next;
     });
+  }
+
+  function toggleTerm(next: boolean) {
+    setTermOpen(next);
+    try {
+      localStorage.setItem("ainside.code.termOpen", next ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function setTermDock(dock: TermDock) {
+    setTermLayout((current) => {
+      const next = { ...current, dock };
+      try {
+        localStorage.setItem(TERM_LAYOUT_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+    toggleTerm(true);
+  }
+
+  function onTermResizeStart(event: PointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    const dock = termLayout.dock;
+    const origin = dock === "side" ? event.clientX : event.clientY;
+    const start = termLayout.size[dock];
+    function move(next: globalThis.PointerEvent) {
+      const pos = dock === "side" ? next.clientX : next.clientY;
+      const max = dock === "side" ? window.innerWidth * 0.72 : window.innerHeight * 0.82;
+      const min = dock === "side" ? 260 : 140;
+      const size = Math.round(Math.min(max, Math.max(min, start + (origin - pos))));
+      setTermLayout((current) => {
+        const nextLayout = { ...current, size: { ...current.size, [dock]: size } };
+        try {
+          localStorage.setItem(TERM_LAYOUT_KEY, JSON.stringify(nextLayout));
+        } catch {
+          /* ignore */
+        }
+        return nextLayout;
+      });
+    }
+    function up() {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  async function runTermCommand(command: string): Promise<boolean> {
+    const root = workspaceRef.current;
+    if (!root || term.running || term.busy) return false;
+    let grant: "once" | "folder" | null = writeStatus?.canWrite ? null : "once";
+    if (!writeStatus?.canWrite) {
+      const choice = await feedback.choose({
+        title: `Eseguire un comando in ${folderName(root)}?`,
+        description:
+          "Parte in questa cartella, con lo stesso permesso di quando il modello scrive i file.",
+        actions: [
+          { id: "once", label: "Solo stavolta", variant: "primary" },
+          { id: "folder", label: "Sempre in questa cartella" },
+        ],
+        cancelLabel: "Non ora",
+      });
+      if (!choice) return false;
+      grant = choice === "folder" ? "folder" : "once";
+    }
+    toggleTerm(true);
+    const ok = await term.run(root, command, grant);
+    if (grant === "folder") {
+      await refreshWriteStatus();
+    }
+    return ok;
   }
 
   function resize() {
@@ -643,7 +787,16 @@ export function CodeView({ onNavigate }: CodeViewProps) {
           selected={preview?.rel ?? null}
           onSelect={(rel) => void openFile(rel)}
         />
-        <PreviewHost doc={previewDoc} live={previewLive} resetKey={session?.id}>
+        <div
+          className={cx("code-stage", termOpen && `is-term-${termLayout.dock}`)}
+          style={{ ["--term-size" as string]: `${termLayout.size[termLayout.dock]}px` }}
+        >
+        <PreviewHost
+          doc={previewDoc}
+          url={term.previewUrl}
+          live={previewLive || Boolean(term.previewUrl)}
+          resetKey={session?.id}
+        >
         <div className="chat-main">
           <header className="chat-head">
             <div className="chat-head-meta">
@@ -762,11 +915,14 @@ export function CodeView({ onNavigate }: CodeViewProps) {
                 description={runtime.error ?? snapshot?.message ?? "Qualcosa è andato storto."}
                 detail={snapshot?.errorDetail}
                 action={
-                  active ? (
-                    <Button onClick={() => void runtime.load()}>Riprova</Button>
-                  ) : (
-                    <Button onClick={() => onNavigate("models")}>Scegli un modello</Button>
-                  )
+                  <div className="empty-actions">
+                    {active ? (
+                      <Button onClick={() => void runtime.load()}>Riprova</Button>
+                    ) : (
+                      <Button onClick={() => onNavigate("models")}>Scegli un modello</Button>
+                    )}
+                    <Button onClick={() => onNavigate("debug")}>Diagnostica</Button>
+                  </div>
                 }
               />
             </div>
@@ -881,12 +1037,21 @@ export function CodeView({ onNavigate }: CodeViewProps) {
               ),
             )}
             {runtime.reply ? (
-              <AssistantMessage
-                text={runtime.reply}
-                streaming
-                showThinking={showThinking}
-                durationMs={elapsedMs}
-              />
+              <>
+                <AssistantMessage
+                  text={displayStreaming(runtime.reply)}
+                  streaming
+                  showThinking={showThinking}
+                  durationMs={elapsedMs}
+                />
+                {livePatches.length ? (
+                  <div className="code-patch-list">
+                    {livePatches.map((patch) => (
+                      <CodePatchCard key={patch.rel} patch={patch} />
+                    ))}
+                  </div>
+                ) : null}
+              </>
             ) : snapshot?.phase === "inRisposta" ? (
               <AssistantMessage
                 text="Sto preparando la risposta…"
@@ -906,22 +1071,22 @@ export function CodeView({ onNavigate }: CodeViewProps) {
                 <span>
                   {/Leggo `/.test(runtime.reply)
                     ? "Sto leggendo un file…"
-                    : /Scrivo `/.test(runtime.reply)
-                      ? "Sto scrivendo un file…"
+                    : /\*\*\*\s*File:/i.test(runtime.reply) || /```/.test(runtime.reply)
+                      ? "Anteprima — i file non sono ancora toccati"
                       : thinkingOn
-                      ? "Ragionamento acceso · generazione…"
-                      : "Generazione in corso…"}
+                        ? "Ragionamento acceso · generazione…"
+                        : "Generazione in corso — i file non sono ancora toccati"}
                 </span>
                 <span>{formatDuration(elapsedMs)}</span>
                 <span>{formatTokenRate(tokenRate)}</span>
               </div>
             )}
-            {(snapshot?.phase === "avvio" ||
-              snapshot?.phase === "motore" ||
-              snapshot?.phase === "errore") && (
-              <div className="chat-status-line chat-status-line--stack">
+            {(snapshot?.phase === "avvio" || snapshot?.phase === "motore") && (
+              <div className="chat-status-line">
                 <span>{snapshot.message}</span>
-                <RuntimeLoadLog snapshot={snapshot} />
+                <Button variant="ghost" onClick={() => onNavigate("debug")}>
+                  Diagnostica
+                </Button>
               </div>
             )}
             {mentions.length > 0 ? (
@@ -1004,11 +1169,41 @@ export function CodeView({ onNavigate }: CodeViewProps) {
                 showThinking={showThinking}
                 onToggleThinking={() => void changeThinking(!thinkingOn)}
                 onToggleShow={toggleShowThinking}
+                extra={
+                  <Tooltip label={termOpen ? "Chiudi terminale" : "Apri terminale"}>
+                    <Button
+                      variant="icon"
+                      className={cx(termOpen && "is-on")}
+                      aria-pressed={termOpen}
+                      aria-label={termOpen ? "Chiudi terminale" : "Apri terminale"}
+                      onClick={() => toggleTerm(!termOpen)}
+                    >
+                      <IconTerminal size={14} />
+                    </Button>
+                  </Tooltip>
+                }
               />
             </form>
           </div>
         </div>
         </PreviewHost>
+        <CodeTerminal
+          open={termOpen}
+          folder={rootName}
+          folderPath={workspace}
+          running={term.running}
+          busy={term.busy}
+          log={term.log}
+          error={term.error}
+          dock={termLayout.dock}
+          onDock={setTermDock}
+          onOpen={() => toggleTerm(true)}
+          onClose={() => toggleTerm(false)}
+          onRun={runTermCommand}
+          onStop={() => void term.stop()}
+          onResizeStart={onTermResizeStart}
+        />
+        </div>
       </div>
     </section>
   );

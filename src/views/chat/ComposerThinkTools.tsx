@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { cx } from "../../lib/cx";
 import { Button } from "../../ui/controls";
 import { IconEye, IconSpark } from "../../ui/icons";
@@ -8,11 +9,13 @@ export function ComposerThinkTools({
   showThinking,
   onToggleThinking,
   onToggleShow,
+  extra,
 }: {
   thinkingOn: boolean;
   showThinking: boolean;
   onToggleThinking: () => void;
   onToggleShow: () => void;
+  extra?: ReactNode;
 }) {
   return (
     <div className="chat-composer-tools">
@@ -38,6 +41,7 @@ export function ComposerThinkTools({
           <IconEye size={14} />
         </Button>
       </Tooltip>
+      {extra}
     </div>
   );
 }

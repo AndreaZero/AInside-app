@@ -4,12 +4,14 @@ mod ignore;
 mod pack;
 mod patch;
 mod paths;
+pub(crate) mod term;
 pub(crate) mod write;
 
 pub use pack::{
     build_pack, clip_utf8, coding_system, fit_file_block, leggi_paths, mentions_in, strip_leggi_lines,
     with_pack,
 };
+pub use term::TermHub;
 pub use write::WorkspaceHub;
 
 use std::fs;

@@ -1,8 +1,23 @@
 import { useRuntimeStatus } from "../hooks/useRuntime";
 import { cx } from "../lib/cx";
 import { formatProgress } from "../lib/format";
+import type { RuntimeSnapshot } from "../lib/runtime";
 import type { RouteId } from "../navigation/routes";
 import { Button } from "../ui/controls";
+
+export function RuntimeLoadLog({ snapshot }: { snapshot: RuntimeSnapshot }) {
+  const text = [snapshot.log, snapshot.errorDetail]
+    .map((item) => item?.trim() ?? "")
+    .filter((item, index, all) => item.length > 0 && all.indexOf(item) === index)
+    .join("\n\n");
+  if (!text) return null;
+  return (
+    <details className="runtime-strip-log">
+      <summary>Dettaglio tecnico</summary>
+      <pre>{text}</pre>
+    </details>
+  );
+}
 
 export function RuntimeBanner({ onNavigate }: { onNavigate: (route: RouteId) => void }) {
   const runtime = useRuntimeStatus();

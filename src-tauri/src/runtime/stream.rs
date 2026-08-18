@@ -85,7 +85,7 @@ pub fn complete(
     turns: &[ChatTurn],
     stop: &AtomicBool,
     sample: &SampleConfig,
-    mut on_token: impl FnMut(&str),
+    mut on_token: impl FnMut(&str) -> bool,
 ) -> Result<(), String> {
     let mut messages = vec![json!({"role": "system", "content": sample.system_prompt})];
     for turn in turns {
@@ -166,7 +166,7 @@ pub fn complete(
     {
         if stop.load(Ordering::Relaxed) {
             if opened_think && !closed_think {
-                on_token("\n</think>\n");
+                let _ = on_token("\n</think>\n");
             }
             return Ok(());
         }
@@ -183,43 +183,49 @@ pub fn complete(
                         ignored_after_stop += text.chars().count();
                         if !got_content && ignored_after_stop >= 400 {
                             if let Some(guess) = guess_answer_from_think(&think_buf) {
-                                on_token(&guess);
+                                let _ = on_token(&guess);
                             }
                             return Ok(());
                         }
                         continue;
                     }
                     if !opened_think {
-                        on_token("<think>\n");
+                        if !on_token("<think>\n") {
+                            return Ok(());
+                        }
                         opened_think = true;
                     }
                     think_buf.push_str(&text);
-                    on_token(&text);
+                    if !on_token(&text) {
+                        return Ok(());
+                    }
                     if thinking_should_stop(&think_buf) {
-                        on_token("\n</think>\n");
+                        let _ = on_token("\n</think>\n");
                         closed_think = true;
                         ignore_think = true;
                     }
                 }
                 StreamDelta::Content(text) => {
                     if opened_think && !closed_think {
-                        on_token("\n</think>\n");
+                        let _ = on_token("\n</think>\n");
                         closed_think = true;
                         ignore_think = true;
                     }
                     got_content = true;
-                    on_token(&text);
+                    if !on_token(&text) {
+                        return Ok(());
+                    }
                 }
             }
         }
         line.clear();
     }
     if opened_think && !closed_think {
-        on_token("\n</think>\n");
+        let _ = on_token("\n</think>\n");
     }
     if !got_content {
         if let Some(guess) = guess_answer_from_think(&think_buf) {
-            on_token(&guess);
+            let _ = on_token(&guess);
         }
     }
     Ok(())

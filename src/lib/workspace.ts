@@ -88,6 +88,16 @@ export function stripEditBlocks(text: string): string {
   return text.trim();
 }
 
+export function agentChatText(text: string): string {
+  let out = stripEditBlocks(text);
+  out = out.replace(/```[\s\S]*?```/g, "");
+  const open = out.search(/```/);
+  if (open >= 0) {
+    out = out.slice(0, open);
+  }
+  return out.replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export function flattenFiles(nodes: WorkspaceNode[], into: string[] = []): string[] {
   for (const node of nodes) {
     if (node.dir) {

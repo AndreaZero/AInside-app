@@ -37,6 +37,7 @@ pub fn run() {
         .manage(runtime::RuntimeManager::default())
         .manage(api::ApiHub::default())
         .manage(workspace::WorkspaceHub::default())
+        .manage(workspace::TermHub::default())
         .setup(|app| {
             if settings::current(app.handle())
                 .map(|current| current.api.enabled)
@@ -92,6 +93,9 @@ pub fn run() {
             workspace::write::coding_status,
             workspace::write::coding_grant,
             workspace::write::coding_revoke,
+            workspace::term::term_run,
+            workspace::term::term_stop,
+            workspace::term::term_status,
         ])
         .build(tauri::generate_context!())
         .expect("error while building AInside")
@@ -99,6 +103,9 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 if let Some(hub) = app.try_state::<api::ApiHub>() {
                     hub.shutdown();
+                }
+                if let Some(term) = app.try_state::<workspace::TermHub>() {
+                    term.shutdown();
                 }
                 if let Some(runtime) = app.try_state::<runtime::RuntimeManager>() {
                     runtime.shutdown();

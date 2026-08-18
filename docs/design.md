@@ -44,4 +44,6 @@ Toast, dialog, popover, tooltip, skeleton, spinner, progress, empty, error a due
 
 Sidebar persistente: Nuova chat, Codice, cronologia (chat o lavori, in base al posto), Modelli, Download, Impostazioni. Brand → home. In basso widget prestazioni. Impostazioni ha nav interna.
 
+In Codice, sotto chat e anteprima file: pannello Terminale (cartella aperta), apribile, ridimensionabile (basso / lato / staccato), con comandi e Stop. Un server locale si apre nell’anteprima. Non è un IDE.
+
 Viewport: 1920, 1440, 1366. Sotto ~1100px la sidebar diventa icon-rail.

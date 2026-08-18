@@ -4,7 +4,7 @@ Solo questa modalità. Ricerca web e visione restano parcheggiate in [`plan-capa
 
 AInside oggi è chat di testo ([`ChatView.tsx`](../src/views/ChatView.tsx), [`chats.json`](../src-tauri/src/chat/mod.rs), llama.cpp). Non vede il disco del progetto. La cartella si può già scegliere ([`pickFolder.ts`](../src/lib/pickFolder.ts)); il frontend **non** ha permesso `fs` ([`capabilities/default.json`](../src-tauri/capabilities/default.json)). Giusto: lista, lettura e scrittura passano da Rust.
 
-Principio: *«Dimmi cosa vuoi fare.»* Non è Cursor. Niente IDE, niente terminale in v1, niente Internet. Cartella aperta, conversazione, file letti, modifiche sul disco se hai dato il permesso.
+Principio: *«Dimmi cosa vuoi fare.»* Non è Cursor. Niente IDE, niente Internet. Cartella aperta, conversazione, file, e comandi nella stessa cartella se hai dato il permesso.
 
 ```mermaid
 flowchart LR
@@ -250,12 +250,12 @@ T13 non anticipa il parser dei diff. T15 non scrive. T16 è l’unico che tocca 
 
 ---
 
-## Fuori da questi task
+## Fuori da T13–T16
 
 - DuckDuckGo / globo / `CERCA:`
 - mmproj, graffetta, foto
-- Terminale, git, LSP, Monaco
-- Agente che lancia comandi da solo
+- Git, LSP, Monaco
+- Agente che lancia comandi da solo (arriva in T20, con conferma)
 - Plugin `fs` nel frontend
 - Secondo processo llama.cpp
 
@@ -263,4 +263,13 @@ T13 non anticipa il parser dei diff. T15 non scrive. T16 è l’unico che tocca 
 
 ## Stato
 
-T13–T16 fatti: guscio, lettura, giro agente, scrittura con permessi. Visione e ricerca web restano in pausa.
+T13–T18 fatti: guscio, lettura, giro agente, scrittura con permessi, terminale con comandi nella cartella. Visione e ricerca web restano in pausa.
+
+Fase 6 (terminale nella cartella, non un IDE):
+
+| Task | Lascia |
+| --- | --- |
+| **T17** Guscio terminale | pannello in basso, apri/chiudi. Nessun processo. |
+| **T18** Comandi | spawn nella root, stream, stop, permessi come write. |
+| **T19** Installa / Avvia | `package.json` + node/npm, processo lungo. |
+| **T20** Proponi comando | `ESEGUI:` + conferma. Il modello non lancia da solo. |

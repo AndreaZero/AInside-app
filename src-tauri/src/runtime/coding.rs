@@ -75,6 +75,7 @@ pub fn run(
         stream::complete(port, &round, stop, sample, |token| {
             reply.push_str(token);
             on_token(token);
+            !halt_for_unread_leggi(&reply, &loaded)
         })?;
         if stop.load(std::sync::atomic::Ordering::Relaxed) {
             return Ok(());
@@ -144,7 +145,7 @@ pub fn apply_coding_prompt(
 ) {
     sample.system_prompt = coding_system(model_name, sample.thinking);
     let ctx = context_tokens.max(512);
-    let reply = (ctx / 3).clamp(256, 2048);
+    let reply = (ctx / 3).clamp(256, 1024);
     sample.max_tokens = sample.max_tokens.min(reply);
 }
 
@@ -266,6 +267,30 @@ fn pack_reads(
     (extra, added)
 }
 
+fn halt_for_unread_leggi(reply: &str, loaded: &[String]) -> bool {
+    let text = content_after_think(reply);
+    let finished = if text.ends_with('\n') {
+        text.as_str()
+    } else {
+        text.rsplit_once('\n').map(|(head, _)| head).unwrap_or("")
+    };
+    leggi_paths(finished)
+        .into_iter()
+        .any(|rel| !loaded.iter().any(|old| old == &rel))
+}
+
+fn content_after_think(reply: &str) -> String {
+    let lower = reply.to_ascii_lowercase();
+    if let Some(end) = lower.rfind("</think>") {
+        let rest = &reply[end + 8..];
+        return rest.strip_prefix('\n').unwrap_or(rest).to_string();
+    }
+    if lower.contains("<think>") {
+        return String::new();
+    }
+    reply.to_string()
+}
+
 fn with_packed_last(messages: &[ChatTurn], pack: &str) -> Vec<ChatTurn> {
     let mut out = Vec::new();
     let last_user = messages
@@ -328,5 +353,16 @@ mod tests {
         apply_coding_prompt(&mut sample, Some("Qwen"), 1024);
         assert!(sample.max_tokens <= 1024 / 3);
         assert!(sample.max_tokens >= 256);
+    }
+
+    #[test]
+    fn halts_after_a_complete_leggi_line() {
+        assert!(halt_for_unread_leggi("LEGGI: src/index.css\n", &[]));
+        assert!(!halt_for_unread_leggi("LEGGI: src/index.css", &[]));
+        assert!(!halt_for_unread_leggi(
+            "LEGGI: src/index.css\n",
+            &["src/index.css".into()]
+        ));
+        assert!(!halt_for_unread_leggi("<think>\nLEGGI: src/a.ts\n", &[]));
     }
 }

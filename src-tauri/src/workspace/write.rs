@@ -77,7 +77,7 @@ fn session_has(hub: &WorkspaceHub, root: &str) -> bool {
         .any(|item| settings::same_folder(item, &key))
 }
 
-fn grant_session(hub: &WorkspaceHub, root: &str) {
+pub(crate) fn grant_session(hub: &WorkspaceHub, root: &str) {
     let key = root_key(root);
     let mut inner = hub.inner.lock().expect("workspace lock");
     inner.session.retain(|item| !settings::same_folder(item, &key));
@@ -93,7 +93,7 @@ fn drop_session(hub: &WorkspaceHub, root: Option<&str>) {
     }
 }
 
-fn can_write(app: &AppHandle, hub: &WorkspaceHub, root: &str) -> Result<bool, String> {
+pub(crate) fn can_write(app: &AppHandle, hub: &WorkspaceHub, root: &str) -> Result<bool, String> {
     let settings = settings::current(app)?;
     Ok(settings.coding.write == CodingWrite::Always
         || settings::folder_trusted(&settings, root)
@@ -373,7 +373,10 @@ fn prepare_write(root: &str, edit: &RawEdit) -> Result<WritePlan, EditPreview> {
     } else {
         let source = previous.clone().unwrap_or_default();
         apply_hunks(&source, &edit.hunks).map_err(|_| {
-            fail(format!("Non trovo quel pezzo in `{}`.", file_name(&rel)))
+            fail(format!(
+                "Non trovo quel pezzo in `{}`. Copia il testo vecchio dal file, non a memoria. Il disco non è stato toccato.",
+                file_name(&rel)
+            ))
         })?
     };
     if next.len() > MAX_WRITE {

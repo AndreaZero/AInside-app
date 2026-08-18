@@ -70,8 +70,8 @@ pub fn apply_hunks(source: &str, hunks: &[Hunk]) -> Result<String, String> {
     let crlf = source.contains("\r\n");
     let mut text = source.replace("\r\n", "\n");
     for hunk in hunks {
-        let old = hunk.old.replace("\r\n", "\n");
-        let new = hunk.new.replace("\r\n", "\n");
+        let old = clean_hunk(&hunk.old.replace("\r\n", "\n"));
+        let new = clean_hunk(&hunk.new.replace("\r\n", "\n"));
         if old.is_empty() {
             if text.trim().is_empty() {
                 text = new;
@@ -79,8 +79,8 @@ pub fn apply_hunks(source: &str, hunks: &[Hunk]) -> Result<String, String> {
             }
             return Err("manca il pezzo vecchio".into());
         }
-        if let Some(idx) = text.find(&old) {
-            text.replace_range(idx..idx + old.len(), &new);
+        if let Some(next) = replace_hunk(&text, &old, &new) {
+            text = next;
         } else {
             return Err("pezzo".into());
         }
@@ -90,6 +90,99 @@ pub fn apply_hunks(source: &str, hunks: &[Hunk]) -> Result<String, String> {
     } else {
         Ok(text)
     }
+}
+
+fn clean_hunk(text: &str) -> String {
+    let text = text.trim_matches('\n');
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.len() >= 2 && lines[0].trim().starts_with("```") {
+        let end = if lines.last().is_some_and(|line| line.trim() == "```") {
+            lines.len() - 1
+        } else {
+            lines.len()
+        };
+        return lines[1..end].join("\n");
+    }
+    text.to_string()
+}
+
+fn replace_hunk(text: &str, old: &str, new: &str) -> Option<String> {
+    if let Some(idx) = text.find(old) {
+        let mut next = text.to_string();
+        next.replace_range(idx..idx + old.len(), new);
+        return Some(next);
+    }
+    let starts = line_starts(text);
+    let old_n = line_starts(old).len();
+    if old_n == 0 || old_n > starts.len() {
+        return None;
+    }
+    for i in 0..=starts.len() - old_n {
+        if lines_match(text, &starts, i, old, LineMatch::TrimEnd)
+            || lines_match(text, &starts, i, old, LineMatch::Norm)
+        {
+            return Some(splice_lines(text, &starts, i, old_n, new));
+        }
+    }
+    None
+}
+
+#[derive(Clone, Copy)]
+enum LineMatch {
+    TrimEnd,
+    Norm,
+}
+
+fn line_starts(text: &str) -> Vec<usize> {
+    let mut out = vec![0];
+    for (i, ch) in text.char_indices() {
+        if ch == '\n' && i + 1 < text.len() {
+            out.push(i + 1);
+        }
+    }
+    if text.is_empty() {
+        out.clear();
+    }
+    out
+}
+
+fn line_at<'a>(text: &'a str, starts: &[usize], i: usize) -> &'a str {
+    let start = starts[i];
+    let end = starts.get(i + 1).copied().unwrap_or(text.len());
+    text[start..end].trim_end_matches('\n')
+}
+
+fn lines_match(text: &str, starts: &[usize], at: usize, old: &str, mode: LineMatch) -> bool {
+    let old_starts = line_starts(old);
+    if old_starts.is_empty() || at + old_starts.len() > starts.len() {
+        return false;
+    }
+    old_starts.iter().enumerate().all(|(j, _)| {
+        let have = line_at(text, starts, at + j);
+        let want = line_at(old, &old_starts, j);
+        match mode {
+            LineMatch::TrimEnd => have.trim_end() == want.trim_end(),
+            LineMatch::Norm => norm_line(have) == norm_line(want),
+        }
+    })
+}
+
+fn norm_line(line: &str) -> String {
+    line.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn splice_lines(text: &str, starts: &[usize], at: usize, old_n: usize, new: &str) -> String {
+    let from = starts[at];
+    let to = starts.get(at + old_n).copied().unwrap_or(text.len());
+    let mut insert = new.to_string();
+    if to < text.len() && !insert.ends_with('\n') {
+        insert.push('\n');
+    }
+    let mut out = String::with_capacity(text.len() - (to - from) + insert.len());
+    out.push_str(&text[..from]);
+    out.push_str(&insert);
+    out.push_str(&text[to..]);
+    out
 }
 
 pub fn write_forbidden(rel: &str) -> bool {
@@ -186,7 +279,10 @@ fn preview_one(root: &str, edit: &RawEdit) -> EditPreview {
     match apply_hunks(&source, &edit.hunks) {
         Ok(_) => card.status = "pending".into(),
         Err(_) => {
-            card.error = Some(format!("Non trovo quel pezzo in `{}`.", file_name(&rel)));
+                    card.error = Some(format!(
+                        "Non trovo quel pezzo in `{}`. Copia il testo vecchio dal file, non a memoria. Il disco non è stato toccato.",
+                        file_name(&rel)
+                    ));
         }
     }
     card
@@ -389,6 +485,28 @@ mod tests {
         let out = apply_hunks("const n = 1;\n", &[Hunk {
             old: "const n = 1;".into(),
             new: "const n = 2;".into(),
+        }])
+        .unwrap();
+        assert_eq!(out, "const n = 2;\n");
+    }
+
+    #[test]
+    fn applies_hunk_with_indent_and_spacing() {
+        let source = "  :root {\n    --bg: #0a0a0a;\n    --fg: #fff;\n  }\n";
+        let out = apply_hunks(source, &[Hunk {
+            old: ":root {\n  --bg: #0a0a0a;\n  --fg: #fff;\n}".into(),
+            new: ":root {\n  --bg: #020617;\n  --fg: #e2e8f0;\n}".into(),
+        }])
+        .unwrap();
+        assert!(out.contains("--bg: #020617;"));
+        assert!(!out.contains("#0a0a0a"));
+    }
+
+    #[test]
+    fn strips_fences_inside_hunk() {
+        let out = apply_hunks("const n = 1;\n", &[Hunk {
+            old: "```ts\nconst n = 1;\n```".into(),
+            new: "```ts\nconst n = 2;\n```".into(),
         }])
         .unwrap();
         assert_eq!(out, "const n = 2;\n");

@@ -256,6 +256,7 @@ pub fn start_completion(
         let sample = stream::SampleConfig::from_expert(&expert, thinking, model_name.as_deref());
         let result = stream::complete(port, &messages, &stop, &sample, |token| {
             emit_token(&app2, token);
+            true
         });
         {
             let mut inner = mgr.inner.lock().expect("runtime lock");

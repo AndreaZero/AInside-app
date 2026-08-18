@@ -12,12 +12,12 @@ export function CodePatchCard({
 }) {
   const status =
     patch.status === "applied"
-      ? "Scritto"
+      ? "Scritto sul disco"
       : patch.status === "error"
-        ? "Non applicato"
+        ? "Non scritto"
         : patch.status === "skipped"
           ? "Non ora"
-          : "In attesa";
+          : "Anteprima · disco intatto";
   return (
     <article className={`code-patch is-${patch.status}`}>
       <div className="code-patch-main">
@@ -30,6 +30,9 @@ export function CodePatchCard({
           {patch.created ? <span>nuovo</span> : null}
           {patch.secret ? <span>riservato</span> : null}
         </p>
+        {patch.status === "pending" ? (
+          <p className="code-patch-hint">I file restano com’erano finché non confermi.</p>
+        ) : null}
         {patch.error ? <p className="code-patch-error">{patch.error}</p> : null}
       </div>
       {patch.status === "pending" && onApply ? (
