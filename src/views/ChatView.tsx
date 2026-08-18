@@ -137,7 +137,7 @@ export function ChatView({ onNavigate }: ChatViewProps) {
       try {
         localStorage.setItem("ainside.chat.showThinking", next ? "1" : "0");
       } catch {
-        /* ignore */
+        /* ignored */
       }
       return next;
     });
