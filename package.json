@@ -2,6 +2,19 @@
   "name": "ainside",
   "private": true,
   "version": "0.1.0",
+  "description": "App desktop per modelli AI in locale, senza configurazione tecnica",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AndreaZero/AInside-app.git"
+  },
+  "bugs": {
+    "url": "https://github.com/AndreaZero/AInside-app/issues"
+  },
+  "homepage": "https://github.com/AndreaZero/AInside-app#readme",
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "scripts": {
     "dev": "vite",

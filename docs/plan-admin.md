@@ -19,6 +19,9 @@ isProject: false
 
 # Piano di controllo admin (app locale → tuo server)
 
+> **Bozza non implementata.** Questo testo è uno schizzo interno. Il prodotto pubblico **non** ha account, **non** invia chat a un server AInside e **non** può spegnere da remoto le copie installate. Comportamento reale: [privacy.md](privacy.md).
+
+
 ## Cosa stai descrivendo
 
 Non è un server che gira i modelli al posto dell’utente. Il GGUF e llama.cpp restano sul PC, come oggi.

@@ -26,7 +26,12 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["nsis"],
+    "publisher": "AInside",
+    "copyright": "Copyright © 2026 AndreaZero",
+    "category": "Productivity",
+    "shortDescription": "Modelli AI in locale, senza configurazione",
+    "longDescription": "AInside esegue modelli AI sul tuo computer. Analizza l'hardware, sceglie la versione del modello e configura il runtime. Interfaccia in italiano. Nessun account: chat e file restano sul disco.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -36,7 +41,8 @@
     ],
     "windows": {
       "nsis": {
-        "installMode": "currentUser"
+        "installMode": "currentUser",
+        "languages": ["Italian"]
       }
     }
   }

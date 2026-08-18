@@ -1,0 +1,51 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Installer Windows
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Icone Tauri
+        run: ./scripts/fetch-icons.ps1
+
+      - name: Dipendenze frontend
+        run: npm ci
+
+      - name: Compila e allega alla release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: AInside ${{ github.ref_name }}
+          releaseBody: |
+            Anteprima Windows. Istruzioni: docs/rilascio.md e docs/guida.md.
+
+            Changelog: CHANGELOG.md
+
+            L’installer non contiene i modelli né llama.cpp: li scarica l’app.
+            SmartScreen può avvisare finché il binario non è firmato.
+          releaseDraft: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          args: --bundles nsis

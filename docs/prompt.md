@@ -1,3 +1,5 @@
+> Visione di prodotto. Per chi usa o scarica l’app: [README](../README.md) e [guida](guida.md).
+
 Crea un'app desktop multipiattaforma, inizialmente focalizzata su **Windows**, simile concettualmente a LM Studio e Ollama ma progettata per essere **molto più semplice, automatica e accessibile**, con interfaccia completamente in italiano.
 
 L'obiettivo è permettere anche a un utente non tecnico di eseguire modelli AI in locale senza dover conoscere GGUF, quantizzazioni, GPU layers, context size o configurazioni hardware.

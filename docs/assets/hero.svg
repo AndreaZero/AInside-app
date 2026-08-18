@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">AInside</title>
+  <desc id="desc">Modelli AI in locale. Il software sceglie per il tuo PC.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="960" y2="280" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#05070a"/>
+      <stop offset="1" stop-color="#0c1220"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="700" y1="40" x2="920" y2="240" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#3b82f6" stop-opacity="0.35"/>
+      <stop offset="0.55" stop-color="#8b5cf6" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#22d3ee" stop-opacity="0.12"/>
+    </linearGradient>
+    <radialGradient id="orb" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(820 90) rotate(90) scale(160 200)">
+      <stop stop-color="#3b82f6" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#05070a" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="960" height="280" rx="24" fill="url(#bg)"/>
+  <rect width="960" height="280" rx="24" fill="url(#orb)"/>
+  <rect x="1" y="1" width="958" height="278" rx="23" stroke="#e2e8f6" stroke-opacity="0.08"/>
+  <circle cx="820" cy="140" r="88" fill="url(#glow)" opacity="0.5"/>
+  <path fill="#3b82f6" fill-rule="evenodd" d="M820 52 900 220h-33.6L850.6 190h-61.2L773.6 220H740L820 52Zm0 62.4-22.8 48.5 22.8-15.8 22.8 15.8L820 114.4Z"/>
+  <text x="48" y="92" fill="#8b93a7" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="15" font-weight="600" letter-spacing="0.18em">LOCALE · ITALIANO · AUTOMATICO</text>
+  <text x="48" y="148" fill="#eef2f8" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="48" font-weight="700" letter-spacing="-0.045em">AInside</text>
+  <text x="48" y="188" fill="#8b93a7" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="18">Dimmi cosa vuoi fare. Al resto pensa il software.</text>
+  <rect x="48" y="216" width="168" height="32" rx="16" fill="#3b82f6" fill-opacity="0.16" stroke="#3b82f6" stroke-opacity="0.45"/>
+  <text x="64" y="237" fill="#93c5fd" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" font-weight="600">Windows 10 / 11</text>
+  <rect x="228" y="216" width="132" height="32" rx="16" fill="#8b5cf6" fill-opacity="0.14" stroke="#8b5cf6" stroke-opacity="0.4"/>
+  <text x="244" y="237" fill="#c4b5fd" font-family="Segoe UI, Inter, system-ui, sans-serif" font-size="13" font-weight="600">llama.cpp</text>
+</svg>

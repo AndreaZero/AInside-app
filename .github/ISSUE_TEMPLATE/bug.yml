@@ -1,0 +1,53 @@
+name: Bug
+description: Qualcosa non funziona come dovrebbe
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Grazie. Togli percorsi personali, chiavi e pezzi di chat se non servono.
+  - type: textarea
+    id: cosa
+    attributes:
+      label: Cosa succede
+      placeholder: Messaggio che vedi, schermata, comportamento.
+    validations:
+      required: true
+  - type: textarea
+    id: atteso
+    attributes:
+      label: Cosa ti aspettavi
+    validations:
+      required: true
+  - type: textarea
+    id: passi
+    attributes:
+      label: Come riprodurlo
+      placeholder: |
+        1. Apro …
+        2. Scarico …
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: versione
+    attributes:
+      label: Versione AInside
+      placeholder: 0.1.0 oppure commit
+  - type: input
+    id: windows
+    attributes:
+      label: Windows
+      placeholder: "11 24H2, 10 22H2, …"
+  - type: input
+    id: hw
+    attributes:
+      label: Hardware in breve
+      placeholder: "es. RTX 4070 12 GB, 32 GB RAM, Ryzen 7"
+  - type: textarea
+    id: diag
+    attributes:
+      label: Diagnostica (opzionale)
+      description: Impostazioni / banner motore → Diagnostica. Incolla solo lo stralcio utile.
+      render: text

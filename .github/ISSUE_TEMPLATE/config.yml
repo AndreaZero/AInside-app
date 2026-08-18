@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Guida utente
+    url: https://github.com/AndreaZero/AInside-app/blob/main/docs/guida.md
+    about: Installazione, chat, modelli, codice
+  - name: API locale
+    url: https://github.com/AndreaZero/AInside-app/blob/main/docs/api.md
+    about: Cursor, VS Code, script su localhost:11435
+  - name: Segnalazione di sicurezza
+    url: https://github.com/AndreaZero/AInside-app/security/advisories/new
+    about: Non usare le issue pubbliche per le falle

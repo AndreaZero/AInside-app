@@ -1,0 +1,33 @@
+name: Idea
+description: Una funzione o un miglioramento
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        AInside nasconde la complessità, non la elimina. Le idee che spingono gergo in vista normale vanno in Avanzate.
+  - type: textarea
+    id: problema
+    attributes:
+      label: Problema o bisogno
+      placeholder: Cosa non riesci a fare oggi, da utente.
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Proposta
+    validations:
+      required: true
+  - type: dropdown
+    id: chi
+    attributes:
+      label: A chi serve
+      options:
+        - Chi usa l’app senza toccare le avanzate
+        - Chi accende la modalità esperto
+        - Chi sviluppa / API locale
+        - Non so
+    validations:
+      required: true

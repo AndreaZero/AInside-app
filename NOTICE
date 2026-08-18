@@ -1,0 +1,17 @@
+AInside
+Copyright (c) 2026 AndreaZero
+
+Questo prodotto è rilasciato con licenza MIT (vedi LICENSE).
+I modelli scaricati dall’app hanno licenze proprie, indicate nel catalogo
+e sul repository Hugging Face di ciascuna famiglia. AInside non concede
+diritti sui pesi dei modelli.
+
+Componenti di terze parti usati in esecuzione (non inclusi tutti nel
+binario dell’installer):
+
+- llama.cpp (ggml-org), licenza MIT — motore di inferenza scaricato
+  all’occorrenza dalle release ufficiali su GitHub
+- Tauri, React, Rust e le crate elencate in src-tauri/Cargo.toml —
+  ciascuna con la propria licenza (in genere MIT / Apache-2.0)
+
+I file GGUF arrivano da Hugging Face (CDN pubblico). AInside non li ospita.

@@ -3,6 +3,7 @@
 App desktop locale per eseguire modelli AI senza configurazione tecnica.  
 Non è un clone di LM Studio: l’utente dice cosa vuole fare, il software sceglie quantizzazione, runtime e risorse.
 
+Documentazione pubblica (README, guida, privacy, API, release): `README.md` e `docs/README.md`.  
 Fonte di prodotto: `docs/prompt.md`. Backlog implementativo: `docs/tasks.md`.
 
 ## Principio

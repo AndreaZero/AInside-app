@@ -1,5 +1,8 @@
 # Piano: modalità Codice
 
+> Piano di ingegneria. Stato dei task: [tasks.md](tasks.md). Uso quotidiano: [guida.md](guida.md).
+
+
 Solo questa modalità. Ricerca web e visione restano parcheggiate in [`plan-capability.md`](plan-capability.md): **non** entrano in questi task.
 
 AInside oggi è chat di testo ([`ChatView.tsx`](../src/views/ChatView.tsx), [`chats.json`](../src-tauri/src/chat/mod.rs), llama.cpp). Non vede il disco del progetto. La cartella si può già scegliere ([`pickFolder.ts`](../src/lib/pickFolder.ts)); il frontend **non** ha permesso `fs` ([`capabilities/default.json`](../src-tauri/capabilities/default.json)). Giusto: lista, lettura e scrittura passano da Rust.

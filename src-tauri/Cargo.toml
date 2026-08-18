@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "Modelli AI in locale, senza configurazione"
 authors = ["AInside"]
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/AndreaZero/AInside-app"
+homepage = "https://github.com/AndreaZero/AInside-app"
 
 [lib]
 name = "ainside_lib"
